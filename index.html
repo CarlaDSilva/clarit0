@@ -2100,7 +2100,7 @@ async function geminiCall(prompt, imageBase64=null) {
   const key = STATE.config?.apiKey;
   if (!key) throw new Error('Sin API Key');
   const model = 'gemini-2.0-flash';
-  const url = `[generativelanguage.googleapis.com](https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key})`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const parts = [];
   if (imageBase64) {
     // Remove data URL prefix if present
@@ -2139,7 +2139,7 @@ async function geminiChat(messages, userMsg) {
   const key = STATE.config?.apiKey;
   if (!key) throw new Error('Sin API Key');
   const model = 'gemini-2.0-flash';
-  const url = `[generativelanguage.googleapis.com](https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key})`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const systemPrompt = `Eres Clarito, un asistente doméstico inteligente y amigable que ayuda a gestionar gastos compartidos para dos personas: ${STATE.config.p1.name} y ${STATE.config.p2.name}. Responde siempre en español, de forma breve, amigable y útil. No uses markdown. Responde en texto plano.`;
   const contents = [];
   // Add last 6 messages for context
