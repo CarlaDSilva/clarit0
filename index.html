@@ -78,7 +78,6 @@
       border-radius: 2px;
     }
 
-    /* inputs */
     input, textarea, select {
       font-family: 'DM Sans', sans-serif;
       font-size: 15px;
@@ -123,7 +122,6 @@
       cursor: pointer;
     }
 
-    /* buttons */
     button {
       cursor: pointer;
       font-family: 'DM Sans', sans-serif;
@@ -182,7 +180,6 @@
       border-radius: 10px;
     }
 
-    /* cards */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -196,7 +193,6 @@
       padding: 13px;
     }
 
-    /* tags */
     .tag {
       display: inline-flex;
       align-items: center;
@@ -207,27 +203,11 @@
       font-weight: 500;
     }
 
-    .tag-warn {
-      background: var(--warn-glow);
-      color: var(--warn);
-    }
+    .tag-warn { background: var(--warn-glow); color: var(--warn); }
+    .tag-danger { background: var(--danger-glow); color: var(--danger); }
+    .tag-ok { background: var(--success-glow); color: var(--success); }
+    .tag-accent { background: var(--accent-glow); color: var(--accent); }
 
-    .tag-danger {
-      background: var(--danger-glow);
-      color: var(--danger);
-    }
-
-    .tag-ok {
-      background: var(--success-glow);
-      color: var(--success);
-    }
-
-    .tag-accent {
-      background: var(--accent-glow);
-      color: var(--accent);
-    }
-
-    /* layout helpers */
     .row { display: flex; align-items: center; }
     .row-sb { display: flex; align-items: center; justify-content: space-between; }
     .col { display: flex; flex-direction: column; }
@@ -236,6 +216,7 @@
     .mono { font-family: 'DM Mono', monospace; }
     .muted { color: var(--muted); }
     .small { font-size: 12px; }
+
     .section-label {
       font-size: 11px;
       font-weight: 600;
@@ -261,7 +242,6 @@
     .w100 { width: 100%; }
     .text-center { text-align: center; }
 
-    /* person chip */
     .pchip {
       display: inline-flex;
       align-items: center;
@@ -276,13 +256,8 @@
       background: none;
     }
 
-    .pchip.sel {
-      border-color: currentColor;
-    }
-
-    .pchip:not(.sel) {
-      opacity: .38;
-    }
+    .pchip.sel { border-color: currentColor; }
+    .pchip:not(.sel) { opacity: .38; }
 
     .dot {
       width: 8px;
@@ -298,7 +273,6 @@
       flex-shrink: 0;
     }
 
-    /* owner selector */
     .owner-btn {
       flex: 1;
       padding: 7px 4px;
@@ -319,7 +293,6 @@
       color: var(--sel-color);
     }
 
-    /* nav */
     .nav {
       display: flex;
       background: var(--surface);
@@ -344,9 +317,7 @@
       transition: color .2s;
     }
 
-    .nav-btn.active {
-      color: var(--accent);
-    }
+    .nav-btn.active { color: var(--accent); }
 
     .nav-btn.active::before {
       content: '';
@@ -359,7 +330,6 @@
       border-radius: 0 0 2px 2px;
     }
 
-    /* modal */
     .overlay {
       position: fixed;
       inset: 0;
@@ -392,7 +362,6 @@
       margin: 0 auto 20px;
     }
 
-    /* progress bar */
     .prog {
       height: 5px;
       background: var(--surface2);
@@ -406,7 +375,6 @@
       transition: width .6s ease;
     }
 
-    /* spinner */
     .spinner {
       width: 22px;
       height: 22px;
@@ -416,7 +384,6 @@
       animation: spin .7s linear infinite;
     }
 
-    /* error banner */
     .err-banner {
       background: var(--danger-glow);
       border: 1px solid rgba(255,77,109,.25);
@@ -430,7 +397,6 @@
       gap: 8px;
     }
 
-    /* header */
     .header {
       padding: calc(env(safe-area-inset-top,0px) + 18px) 18px 12px;
       display: flex;
@@ -439,7 +405,6 @@
       flex-shrink: 0;
     }
 
-    /* floating AI */
     .fab {
       position: fixed;
       bottom: calc(76px + var(--safe));
@@ -458,9 +423,7 @@
       transition: all .2s;
     }
 
-    .fab:active {
-      transform: scale(.93);
-    }
+    .fab:active { transform: scale(.93); }
 
     .fab.has-q {
       border-color: var(--danger);
@@ -483,7 +446,6 @@
       justify-content: center;
     }
 
-    /* tabs */
     .tab-pills {
       display: flex;
       gap: 5px;
@@ -510,7 +472,6 @@
       color: var(--text);
     }
 
-    /* bar chart */
     .bars {
       display: flex;
       gap: 5px;
@@ -537,7 +498,6 @@
       color: var(--muted);
     }
 
-    /* animations */
     @keyframes fadeIn { from {opacity:0} to {opacity:1} }
     @keyframes slideUp { from {opacity:0; transform:translateY(24px)} to {opacity:1; transform:translateY(0)} }
     @keyframes spin { to {transform:rotate(360deg)} }
@@ -545,7 +505,6 @@
 
     .fade { animation: fadeIn .25s ease; }
 
-    /* empty states */
     .empty {
       text-align: center;
       padding: 44px 20px;
@@ -564,7 +523,6 @@
       margin-bottom: 5px;
     }
 
-    /* onboarding */
     .onboard {
       position: fixed;
       inset: 0;
@@ -581,11 +539,9 @@
 </head>
 
 <body>
-<button id="aiKeyBtn" class="fab" style="right: 78px;">🔑</button>
   <div id="root"></div>
 
   <script>
-    // ─── STATE ────────────────────────────────────────────────────────────────
     const STORE_KEY = 'clarito_v2';
 
     function loadState() {
@@ -622,17 +578,17 @@
     if (!S.people || S.people.length < 2) S.people = DEFAULT_STATE.people;
 
     function save() { saveState(S); }
-		
-		const GEMINI_KEY_STORE = 'clarito_gemini_key';
 
-function getApiKey() {
-  return localStorage.getItem(GEMINI_KEY_STORE) || '';
-}
+    const GEMINI_KEY_STORE = 'clarito_gemini_key';
 
-function setApiKey(key) {
-  localStorage.setItem(GEMINI_KEY_STORE, key);
-}
-    // ─── HELPERS ──────────────────────────────────────────────────────────────
+    function getApiKey() {
+      return localStorage.getItem(GEMINI_KEY_STORE) || '';
+    }
+
+    function setApiKey(key) {
+      localStorage.setItem(GEMINI_KEY_STORE, key);
+    }
+
     const uid = () => Math.random().toString(36).slice(2,9);
     const today = () => new Date().toISOString().split('T')[0];
     const fmt = n => new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0)+'€';
@@ -641,35 +597,29 @@ function setApiKey(key) {
     const personById = id => S.people.find(p=>p.id===id);
     const pendingQ = () => S.aiQuestions.filter(q=>!q.answered);
 
-    // ─── AI CALL ──────────────────────────────────────────────────────────────
     async function callAI(prompt, apiKey) {
-  const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }]
-          }
-        ]
-      })
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              { parts: [{ text: prompt }] }
+            ]
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error?.message || "Error IA");
+      }
+
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     }
-  );
 
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data?.error?.message || "Error IA");
-  }
-
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-}
-
-    // ─── BALANCE ───────────────────────────────────────────────────────────────
     function computeBalance() {
       let owedAtoB = 0, owedBtoA = 0;
 
@@ -716,16 +666,24 @@ function setApiKey(key) {
 
       return t + e;
     }
-document.getElementById('aiKeyBtn').addEventListener('click', () => {
-  const current = getApiKey();
-  const key = prompt('Introduce tu API Key de Gemini', current || '');
-  if (key !== null) {
-    setApiKey(key.trim());
-    alert('API Key guardada');
-  }
-});
 
-    // ─── (continúa igual el resto del script con indentación ya alineada)
+    // Botón API KEY (único y correcto)
+    const aiBtn = document.createElement('button');
+    aiBtn.id = 'aiKeyBtn';
+    aiBtn.className = 'fab';
+    aiBtn.style.right = '78px';
+    aiBtn.textContent = '🔑';
+
+    document.body.appendChild(aiBtn);
+
+    aiBtn.addEventListener('click', () => {
+      const current = getApiKey();
+      const key = prompt('Introduce tu API Key de Gemini', current || '');
+      if (key !== null) {
+        setApiKey(key.trim());
+        alert('API Key guardada');
+      }
+    });
   </script>
 </body>
 </html>
