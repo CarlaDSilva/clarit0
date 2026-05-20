@@ -466,82 +466,247 @@ function openModal(html){document.getElementById('modal-content').innerHTML=html
 function closeModal(){document.getElementById('modal-overlay').style.display='none';}
 function normalizeKey(name){return name.toLowerCase().replace(/[^a-záéíóúñ0-9]/g,' ').replace(/\s+/g,' ').trim();}
 
-// ── IMAGE COMPRESSION ──────────────────────────────────────────
-function compressImage(file, maxW=800, quality=0.7){
+// ── IMAGE → CANVAS (resize) ────────────────────────────────────
+function resizeImageToCanvas(file, maxW=1200){
   return new Promise((res,rej)=>{
-    if(file.type==='application/pdf'){
-      // PDFs sent as-is (smaller)
-      const r=new FileReader();
-      r.onload=()=>res({data:r.result.split(',')[1],mime:'application/pdf'});
-      r.onerror=()=>rej(new Error('Error leyendo PDF'));
-      r.readAsDataURL(file);
-      return;
-    }
-    const img=new Image();
     const url=URL.createObjectURL(file);
+    const img=new Image();
     img.onload=()=>{
       URL.revokeObjectURL(url);
       let w=img.width,h=img.height;
       if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
-      const canvas=document.createElement('canvas');
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      const dataURL=canvas.toDataURL('image/jpeg',quality);
-      res({data:dataURL.split(',')[1],mime:'image/jpeg'});
+      const c=document.createElement('canvas');
+      c.width=w;c.height=h;
+      const ctx=c.getContext('2d');
+      // Slightly sharpen for OCR
+      ctx.filter='contrast(1.2) brightness(1.05)';
+      ctx.drawImage(img,0,0,w,h);
+      res(c);
     };
-    img.onerror=()=>rej(new Error('Error procesando imagen'));
+    img.onerror=()=>rej(new Error('No se pudo cargar la imagen'));
     img.src=url;
   });
 }
 
-// ── GEMINI API ─────────────────────────────────────────────────
-async function callGemini(prompt, imgData, mimeType){
+// ── GEMINI TEXT-ONLY (no images) ──────────────────────────────
+async function callGemini(prompt){
   const key=DB.apiKey;
   if(!key) throw new Error('No hay API key. Ve a Configuración.');
-
-  const parts=[];
-  if(imgData&&mimeType) parts.push({inline_data:{mime_type:mimeType,data:imgData}});
-  parts.push({text:prompt});
-
   const body={
-    contents:[{role:'user',parts}],
+    contents:[{role:'user',parts:[{text:prompt}]}],
     generationConfig:{temperature:0.1,maxOutputTokens:2048}
   };
-
-  // Try lite model first (more generous quota), fallback to flash
   const models=['gemini-2.0-flash-lite','gemini-2.0-flash'];
-
   for(const model of models){
-    for(let attempt=0;attempt<3;attempt++){
+    for(let attempt=0;attempt<2;attempt++){
       const res=await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
         {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
       );
       if(res.status===429){
-        const wait=(attempt+1)*20000;
-        setOCRStatus(`Límite de peticiones (${model}).\nEsperando ${wait/1000}s antes de reintentar...`);
+        const wait=(attempt+1)*15000;
+        setOCRStatus(`Cuota agotada. Reintentando en ${wait/1000}s...`);
         await new Promise(r=>setTimeout(r,wait));
         continue;
       }
-      if(res.status===404){break;} // try next model
-      if(!res.ok){
-        const err=await res.json().catch(()=>({}));
-        throw new Error(err.error?.message||`Error HTTP ${res.status}`);
-      }
+      if(res.status===404) break;
+      if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error?.message||`HTTP ${res.status}`);}
       const data=await res.json();
       return data.candidates?.[0]?.content?.parts?.[0]?.text||'';
     }
   }
-  throw new Error('No se pudo conectar con la API. Espera un minuto e inténtalo de nuevo.');
+  throw new Error('No se pudo conectar con Gemini. Inténtalo más tarde.');
 }
 
-// ── TICKET PROCESSING ──────────────────────────────────────────
+// ── LOCAL JS TICKET PARSER ─────────────────────────────────────
+function parseTicketText(raw){
+  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
+  const result={store:'',date:null,total:0,last4:null,products:[],errors:[],warnings:[]};
+
+  // --- Store detection ---
+  const STORES=['mercadona','lidl','dia','carrefour','aldi','eroski','alcampo','consum','bonpreu','condis','hipercor','el corte inglés','freshco','supercor'];
+  for(const l of lines.slice(0,6)){
+    const ll=l.toLowerCase();
+    const found=STORES.find(s=>ll.includes(s));
+    if(found){result.store=found.charAt(0).toUpperCase()+found.slice(1);break;}
+  }
+
+  // --- Date detection ---
+  const dateRx=/\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\b/;
+  for(const l of lines){
+    const m=l.match(dateRx);
+    if(m){
+      let[,d,mo,y]=m;
+      if(y.length===2) y='20'+y;
+      const dt=new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
+      if(!isNaN(dt)){result.date=dt.toISOString().slice(0,10);break;}
+    }
+  }
+
+  // --- Last 4 card digits ---
+  const cardRx=/(?:tarjeta|card|visa|master|débito|crédito).*?(\d{4})\b/i;
+  const cardRx2=/\*{2,}(\d{4})\b/;
+  for(const l of lines){
+    let m=l.match(cardRx)||l.match(cardRx2);
+    if(m){result.last4=m[1];break;}
+  }
+
+  // --- Total detection ---
+  const totalRx=/(?:total|importe|a\s*pagar|sum[ao]?)[\s:]*(\d+[.,]\d{2})/i;
+  const totalRx2=/^(\d+[.,]\d{2})\s*€?\s*$/;
+  let totalCandidates=[];
+  for(const l of lines){
+    let m=l.match(totalRx);
+    if(m){result.total=parseFloat(m[1].replace(',','.'));break;}
+    m=l.match(totalRx2);
+    if(m) totalCandidates.push(parseFloat(m[1].replace(',','.')));
+  }
+  if(!result.total&&totalCandidates.length) result.total=Math.max(...totalCandidates);
+
+  // --- Product lines ---
+  // Typical pattern: PRODUCT_NAME    PRICE or QTY x PRICE = TOTAL
+  const priceRx=/(\d+[.,]\d{2})\s*[€]?\s*$/;
+  const discountRx=/^[-–]\s*(\d+[.,]\d{2})/;
+  const skipRx=/^(total|iva|impuesto|ticket|gracias|fecha|tarjeta|visa|master|cif|nif|tel[eé]f|efectivo|cambio|entrega|sum[ao]|subtotal|a\s*pagar|euros?|[*]{3,}|\d{4,})/i;
+
+  let lastProduct=null;
+  for(const line of lines){
+    if(skipRx.test(line)) continue;
+    // Discount line (starts with minus)
+    const disc=line.match(discountRx);
+    if(disc&&lastProduct){
+      const d=parseFloat(disc[1].replace(',','.'));
+      lastProduct.discount=(lastProduct.discount||0)+d;
+      lastProduct.finalPrice=Math.max(0,lastProduct.finalPrice-d);
+      lastProduct.price=lastProduct.finalPrice;
+      continue;
+    }
+    const pm=line.match(priceRx);
+    if(!pm) continue;
+    const price=parseFloat(pm[1].replace(',','.'));
+    if(price<=0||price>500) continue;
+    const rawName=line.slice(0,line.lastIndexOf(pm[1])).replace(/\s+/g,' ').trim();
+    if(rawName.length<2) continue;
+    // Qty detection: "2 x 1,50" or "2x1,50"
+    const qtyRx=/^(\d+)\s*[xX]\s*/;
+    const qm=rawName.match(qtyRx);
+    const qty=qm?parseInt(qm[1]):1;
+    const cleanName=qm?rawName.slice(qm[0].length).trim():rawName;
+    const prod={
+      rawName:rawName,
+      name:normalizeProdName(cleanName),
+      price:price,finalPrice:price,
+      discount:0,qty:qty,
+      confidence:0.85,
+      category:guessCat(cleanName),
+      assignedTo:null,shared:true,pct1:50
+    };
+    result.products.push(prod);
+    lastProduct=prod;
+  }
+
+  if(!result.store) result.errors.push('No se detectó el supermercado');
+  if(!result.date) result.warnings.push('No se detectó la fecha');
+  if(!result.last4) result.warnings.push('No se detectó tarjeta bancaria');
+  if(result.products.length===0) result.errors.push('No se detectaron productos');
+
+  return result;
+}
+
+function normalizeProdName(raw){
+  // Expand common abbreviations found in Spanish supermarket tickets
+  const abbr={
+    'LT':'litro','KG':'kg','GR':'g','GRS':'g','ML':'ml','UDS':'uds',
+    'FRESC':'fresco','FRES':'fresco','BIO':'bio','ECO':'eco',
+    'NAT':'natural','NAT.':'natural','DESC':'descafeinado',
+    'INT':'integral','INTEG':'integral','SIN GLUT':'sin gluten',
+    'PECH':'pechuga','CONT':'control','PROT':'proteico','ORIG':'original',
+    'CHOC':'chocolate','VAN':'vainilla','FRES':'fresa',
+    '0%':'0%','S/SAL':'sin sal'
+  };
+  let name=raw.toUpperCase();
+  // Replace abbreviations
+  Object.entries(abbr).forEach(([k,v])=>{name=name.replace(new RegExp('\\b'+k+'\\b','g'),v.toUpperCase());});
+  // Title case
+  name=name.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+  return name.trim();
+}
+
+const CAT_KEYWORDS={
+  alimentación:['arroz','pasta','aceite','sal','azucar','harina','conserva','lata','tomate','atun','sardina','bote','sopa','caldo','legumbre','garbanzo','lenteja','alubia','galleta','bollería','cereal','pan','tostada'],
+  lácteos:['leche','yogur','queso','mantequilla','nata','kefir','batido','vegetal'],
+  fruta:['manzana','naranja','plátano','tomate','lechuga','zanahoria','cebolla','ajo','pimiento','fruta','verdura','ensalada','espinaca','brocoli','puerro'],
+  carne:['pollo','cerdo','ternera','pechuga','filete','lomo','jamón','chorizo','salchich','bacon','carne'],
+  pescado:['salmón','merluza','atún','bacalao','gamba','mejillón','calamar','pescado','marisco','sardin'],
+  bebidas:['agua','zumo','refresco','cerveza','vino','cola','fanta','sprite','nestea','café','té','infusion'],
+  higiene:['jabón','gel','champú','dentif','pasta dent','colonia','desodorante','afeitad','pañal','compresas','higien','papel higienico','papel wc'],
+  limpieza:['detergente','suavizante','lejia','limpiador','bayeta','fregasuelos','lavaplatos','limpiacristal','insecticida','papel cocina','bolsa basura'],
+  congelados:['helado','pizza','congelado'],
+};
+function guessCat(name){
+  const nl=name.toLowerCase();
+  for(const[cat,kws]of Object.entries(CAT_KEYWORDS)){
+    if(kws.some(k=>nl.includes(k))) return cat;
+  }
+  return'otro';
+}
+
+// ── TICKET PROCESSING: OCR → PARSER → (AI fallback) ───────────
 async function processFile(file){
-  showOCRLoading('Comprimiendo imagen...');
+  showOCRLoading('Preparando imagen...');
   try{
-    const {data,mime}=await compressImage(file);
-    setOCRStatus('Enviando a Gemini IA...');
-    const result=await analyzeTicketWithGemini(data,mime);
+    let ocrText='';
+    if(file.type==='application/pdf'){
+      setOCRStatus('PDFs: introduce el ticket manualmente.');
+      hideOCRLoading();
+      openTicketEditor(getEmptyTicket());
+      return;
+    }
+    // 1. Resize for OCR
+    setOCRStatus('Optimizando imagen para OCR...');
+    const canvas=await resizeImageToCanvas(file,1400);
+
+    // 2. Tesseract OCR (local, no API calls)
+    setOCRStatus('Leyendo texto del ticket (OCR local)...');
+    const worker=await Tesseract.createWorker('spa+eng',1,{
+      logger:m=>{
+        if(m.status==='recognizing text'){
+          setOCRStatus(`OCR: ${Math.round((m.progress||0)*100)}%`);
+        }
+      }
+    });
+    const {data:{text}}=await worker.recognize(canvas);
+    await worker.terminate();
+    ocrText=text;
+
+    if(!ocrText||ocrText.trim().length<20){
+      result=getEmptyTicket();
+      result.errors=['El OCR no extrajo texto suficiente. Revisa la imagen o introduce manualmente.'];
+      hideOCRLoading();openTicketEditor(result);return;
+    }
+
+    // 3. Local JS parser
+    setOCRStatus('Analizando ticket...');
+    let result=parseTicketText(ocrText);
+    result.ocrRaw=ocrText;
+
+    // 4. AI fallback only if parser found 0 products
+    if(result.products.length===0&&DB.apiKey){
+      setOCRStatus('Parser falló. Usando IA como respaldo (solo texto)...');
+      try{
+        result=await analyzeWithGeminiTextOnly(ocrText);
+      }catch(e){
+        result.warnings.push('IA no disponible: '+e.message);
+      }
+    }
+
+    // 5. Apply knowledge base
+    result.products=result.products.map(p=>applyKnowledgeToProduct(p));
+    result.type='ticket';result.id=uid();
+    result.payer=DB.persons[0].id;result.confirmed=false;
+    result.createdAt=new Date().toISOString();
+    if(result.last4&&DB.knowledge.cards[result.last4]) result.payer=DB.knowledge.cards[result.last4];
+
     hideOCRLoading();
     openTicketEditor(result);
   }catch(err){
@@ -551,25 +716,20 @@ async function processFile(file){
   }
 }
 
-async function analyzeTicketWithGemini(imgData, mime){
+// ── GEMINI TEXT-ONLY FALLBACK ─────────────────────────────────
+async function analyzeWithGeminiTextOnly(ocrText){
   const knownProds=Object.entries(DB.knowledge.products).slice(0,8)
     .map(([k,v])=>`${k}→${v.shared?'común':personName(v.person)}`).join(', ');
+  const prompt=`Analiza este texto de un ticket de supermercado español y devuelve SOLO JSON sin markdown:
+{"store":"","date":"YYYY-MM-DD o null","total":0,"last4":"4 dígitos o null","products":[{"rawName":"","name":"nombre legible","price":0,"discount":0,"qty":1,"confidence":0.8,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|otro"}],"errors":[],"warnings":[]}
+Normaliza nombres (SAL TO 500G→Salsa tomate 500g). Detecta descuentos.${knownProds?` Conocidos: ${knownProds}`:''}
 
-  const prompt=`Analiza este ticket de supermercado. Devuelve SOLO JSON sin markdown ni texto extra:
-{"store":"","date":"YYYY-MM-DD o null","total":0,"last4":"4 dígitos o null","products":[{"rawName":"texto original","name":"nombre legible normalizado","price":0,"discount":0,"qty":1,"confidence":0.9,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|otro"}],"errors":[],"warnings":[]}
-Normaliza nombres (ej: SAL TO 500G→Salsa tomate 500g). Detecta descuentos. Confidence baja si hay dudas.${knownProds?` Productos conocidos: ${knownProds}`:''}`;
+TEXTO DEL TICKET:
+${ocrText.slice(0,3000)}`;
 
-  const text=await callGemini(prompt,imgData,mime);
-  try{
-    const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    const parsed=JSON.parse(clean);
-    parsed.products=(parsed.products||[]).map(p=>applyKnowledgeToProduct(p));
-    parsed.type='ticket';parsed.id=uid();
-    parsed.payer=DB.persons[0].id;parsed.confirmed=false;
-    parsed.createdAt=new Date().toISOString();
-    if(parsed.last4&&DB.knowledge.cards[parsed.last4]) parsed.payer=DB.knowledge.cards[parsed.last4];
-    return parsed;
-  }catch(e){return getEmptyTicket();}
+  const text=await callGemini(prompt);
+  const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  return JSON.parse(clean);
 }
 
 function applyKnowledgeToProduct(prod){
@@ -1227,9 +1387,9 @@ async function sendAIMessage(){
   input.value='';
   DB.aiConvMessages.push({role:'user',content:msg});renderAIChat();
   const {paid,owes,amount}=calcBalance();
-  const ctx=`Eres el asistente de Clarito, app de gastos compartidos. Personas: ${DB.persons.map(p=>p.name).join(', ')}. Balance: ${amount>0.01?personName(owes)+' debe '+fmt(amount):'al día'}. Tickets: ${DB.tickets.filter(t=>t.confirmed).length}. Responde en español, breve y amigable.`;
+      const ctx=`Eres el asistente de Clarito, app de gastos compartidos. Personas: ${DB.persons.map(p=>p.name).join(', ')}. Balance: ${amount>0.01?personName(owes)+' debe '+fmt(amount):'al día'}. Tickets: ${DB.tickets.filter(t=>t.confirmed).length}. Responde en español, breve y amigable.`;
   try{
-    const resp=await callGemini(ctx+'\nPregunta: '+msg,null,null);
+    const resp=await callGemini(ctx+'\nPregunta: '+msg);
     DB.aiConvMessages.push({role:'bot',content:resp});saveDB();renderAIChat();
     const msgs=document.getElementById('ai-messages');if(msgs)msgs.scrollTop=msgs.scrollHeight;
   }catch(err){
