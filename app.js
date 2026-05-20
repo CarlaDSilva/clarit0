@@ -163,8 +163,8 @@ function imageToBase64(file, maxW=900, quality=0.78){
   });
 }
 
-// Returns a blob URL for Tesseract (larger, better quality)
-function imageToBlobUrl(file, maxW=1600, quality=0.92){
+// Returns a base64 data URL for Tesseract (high quality, grayscale enhanced)
+function imageToDataUrl(file, maxW=1600){
   return new Promise((res,rej)=>{
     const url=URL.createObjectURL(file);
     const img=new Image();
@@ -175,14 +175,23 @@ function imageToBlobUrl(file, maxW=1600, quality=0.92){
       const c=document.createElement('canvas');
       c.width=w;c.height=h;
       const ctx=c.getContext('2d');
-      // Enhance contrast for OCR
-      ctx.filter='contrast(1.2) brightness(1.08) grayscale(1)';
       ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
       ctx.drawImage(img,0,0,w,h);
-      c.toBlob(blob=>{
-        if(!blob)rej(new Error('Error convirtiendo imagen'));
-        else res({blobUrl:URL.createObjectURL(blob),blob});
-      },'image/jpeg',quality);
+      // Apply contrast enhancement via pixel manipulation for OCR
+      const id=ctx.getImageData(0,0,w,h);
+      const d=id.data;
+      for(let i=0;i<d.length;i+=4){
+        // Grayscale
+        const gray=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+        // Increase contrast: push values toward black or white
+        const contrast=1.4;
+        const factor=(259*(contrast*255+255))/(255*(259-contrast*255));
+        const val=Math.min(255,Math.max(0,factor*(gray-128)+128));
+        d[i]=d[i+1]=d[i+2]=val;
+      }
+      ctx.putImageData(id,0,0);
+      // Return as data URL (Tesseract accepts this reliably)
+      res(c.toDataURL('image/png'));
     };
     img.onerror=()=>rej(new Error('No se pudo cargar la imagen'));
     img.src=url;
@@ -190,30 +199,24 @@ function imageToBlobUrl(file, maxW=1600, quality=0.92){
 }
 
 // ── TESSERACT OCR ──────────────────────────────────────────────
-async function runTesseract(blobUrl){
-  // Tesseract is loaded globally via <script> in index.html
-  // We use window.Tesseract to be explicit
-  const T = window.Tesseract;
-  if(!T) throw new Error('Tesseract no disponible');
-
-  const cfg = window.TesseractConfig || {};
-  const worker = await T.createWorker('eng', 1, {
-    workerPath: cfg.workerPath || 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
-    langPath:   cfg.langPath   || 'https://tessdata.projectnaptha.com/4.0.0',
-    corePath:   cfg.corePath   || 'https://unpkg.com/tesseract.js-core@4.0.4/tesseract-core.wasm.js',
-    logger: m => {
-      if(m.status==='recognizing text')
-        setOCRStatus('OCR: '+Math.round((m.progress||0)*100)+'%');
-      else if(m.status==='loading tesseract core')
-        setOCRStatus('Cargando OCR (primera vez ~10s)...');
-      else if(m.status==='initializing tesseract')
-        setOCRStatus('Iniciando motor OCR...');
-      else if(m.status==='loading language traineddata')
-        setOCRStatus('Descargando modelo de idioma...');
+async function runTesseract(dataUrl){
+  const T=window.Tesseract;
+  if(!T)throw new Error('Tesseract no cargado');
+  const cfg=window.TesseractConfig||{};
+  const worker=await T.createWorker('eng',1,{
+    workerPath: cfg.workerPath||'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
+    langPath:   cfg.langPath  ||'https://tessdata.projectnaptha.com/4.0.0',
+    corePath:   cfg.corePath  ||'https://unpkg.com/tesseract.js-core@4.0.4/tesseract-core.wasm.js',
+    logger:m=>{
+      if(m.status==='recognizing text') setOCRStatus('OCR: '+Math.round((m.progress||0)*100)+'%');
+      else if(m.status==='loading tesseract core') setOCRStatus('Cargando motor OCR...');
+      else if(m.status==='loading language traineddata') setOCRStatus('Descargando modelo (primera vez ~10s)...');
+      else if(m.status==='initializing tesseract') setOCRStatus('Iniciando Tesseract...');
     }
   });
   try{
-    const {data} = await worker.recognize(blobUrl);
+    // Pass the data URL string directly — this is what Tesseract.js v4 accepts most reliably
+    const {data}=await worker.recognize(dataUrl);
     return data.text||'';
   }finally{
     await worker.terminate();
@@ -349,22 +352,20 @@ async function processFile(file){
       return;
     }
 
-    // 1. Get blob URL for Tesseract (high quality)
+    // 1. Convert image to enhanced data URL (PNG, grayscale+contrast)
     setOCRStatus('Procesando imagen...');
-    const {blobUrl,blob} = await imageToBlobUrl(file, 1600, 0.92);
+    const dataUrl = await imageToDataUrl(file, 1600);
 
     let ocrText='';
-    let usedGeminiVision=false;
 
-    // 2. Try Tesseract OCR
+    // 2. Try Tesseract OCR with the data URL
     try{
       setOCRStatus('Iniciando OCR local...');
-      ocrText = await runTesseract(blobUrl);
+      ocrText = await runTesseract(dataUrl);
+      console.log('OCR result length:', ocrText.length);
     }catch(tErr){
-      console.warn('Tesseract falló:', tErr);
+      console.warn('Tesseract falló:', tErr.message);
       ocrText='';
-    }finally{
-      URL.revokeObjectURL(blobUrl);
     }
 
     // 3. Parse OCR text with JS parser
@@ -392,11 +393,12 @@ async function processFile(file){
           result.warnings.push('Gemini texto falló: '+e.message);
         }
       } else {
-        // OCR failed entirely → Gemini Vision with compressed image
-        setOCRStatus('Enviando imagen comprimida a IA...');
+        // OCR failed entirely → Gemini Vision with the same dataUrl (already compressed enough)
+        setOCRStatus('Enviando imagen a IA como último recurso...');
         try{
-          const b64 = await imageToBase64(file, 900, 0.78);
-          result = await geminiVision(b64);
+          // Recompress to smaller size for Gemini to save quota
+          const smallB64 = await imageToBase64(file, 900, 0.78);
+          result = await geminiVision(smallB64);
           usedGeminiVision = true;
         }catch(e){
           result.warnings.push('Gemini visión falló: '+e.message);
