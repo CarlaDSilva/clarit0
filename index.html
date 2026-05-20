@@ -24,17 +24,11 @@ button{background:none;border:none;cursor:pointer;color:inherit;font-family:inhe
 input,textarea,select{font-family:inherit;background:var(--bg3);color:var(--txt0);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:10px 14px;font-size:15px;outline:none;width:100%}
 input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 textarea{resize:vertical;min-height:80px}
-
-/* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
-
-/* ── LAYOUT ── */
 #app{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
 #view{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:80px}
-
-/* ── BOTTOM NAV ── */
 #nav{
   position:fixed;bottom:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
@@ -44,78 +38,56 @@ textarea{resize:vertical;min-height:80px}
   padding:8px 0 max(8px,env(safe-area-inset-bottom));
   z-index:100;
 }
-.nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 12px;border-radius:var(--rad-sm);transition:.2s}
-.nav-btn svg{width:24px;height:24px;stroke-width:1.7}
+.nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 10px;border-radius:var(--rad-sm);transition:.2s}
+.nav-btn svg{width:24px;height:24px;stroke-width:1.7;stroke:var(--txt2)}
 .nav-btn span{font-size:10px;color:var(--txt2)}
 .nav-btn.active svg{stroke:var(--accent)}
 .nav-btn.active span{color:var(--accent)}
-.nav-btn svg{stroke:var(--txt2)}
-
-/* ── SCREEN HEADER ── */
 .screen-header{
   position:sticky;top:0;z-index:50;
   background:rgba(13,13,15,0.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
-  padding:52px 20px 14px;
-  border-bottom:1px solid var(--brd);
+  padding:52px 20px 14px;border-bottom:1px solid var(--brd);
 }
 .screen-header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
 .screen-header p{font-size:13px;color:var(--txt2);margin-top:3px}
-
-/* ── CARDS ── */
 .card{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);padding:16px;margin:0 16px 12px}
-.card-sm{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:12px 14px}
-
-/* ── BUTTON STYLES ── */
-.btn-primary{background:var(--accent);color:#fff;border-radius:var(--rad-sm);padding:12px 20px;font-size:15px;font-weight:600;width:100%;text-align:center;transition:.15s}
+.btn-primary{background:var(--accent);color:#fff;border-radius:var(--rad-sm);padding:12px 20px;font-size:15px;font-weight:600;width:100%;text-align:center;transition:.15s;display:block}
 .btn-primary:active{opacity:.8;transform:scale(.98)}
 .btn-secondary{background:var(--bg3);color:var(--txt0);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:11px 18px;font-size:14px;font-weight:500;transition:.15s}
 .btn-secondary:active{opacity:.75}
 .btn-danger{background:rgba(229,83,75,.15);color:var(--red);border:1px solid rgba(229,83,75,.3);border-radius:var(--rad-sm);padding:11px 18px;font-size:14px;font-weight:500}
 .btn-ghost{color:var(--txt1);font-size:14px;padding:8px 12px;border-radius:var(--rad-xs);transition:.15s}
 .btn-ghost:active{background:var(--bg3)}
-
-/* ── BADGE ── */
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
 .badge-red{background:rgba(229,83,75,.18);color:#ff6b65}
 .badge-green{background:rgba(62,207,142,.15);color:#3ecf8e}
 .badge-amber{background:rgba(245,158,11,.15);color:#f59e0b}
 .badge-purple{background:rgba(124,110,245,.18);color:#a89fff}
-.badge-blue{background:rgba(74,158,255,.15);color:#4a9eff}
-
-/* ── PILL TABS ── */
 .pill-tabs{display:flex;gap:6px;padding:12px 16px 0;overflow-x:auto}
 .pill-tabs::-webkit-scrollbar{display:none}
 .pill-tab{flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--brd);color:var(--txt1);transition:.15s}
 .pill-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
-/* ── SETUP SCREEN ── */
-#setup-screen{
-  position:fixed;inset:0;z-index:1000;
-  background:var(--bg0);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;
-}
-.logo-big{font-size:40px;font-weight:800;letter-spacing:-1px;margin-bottom:6px;background:linear-gradient(135deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+/* SETUP */
+#setup-screen{position:fixed;inset:0;z-index:1000;background:var(--bg0);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;overflow-y:auto}
+.logo-wrap{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.logo-img{width:52px;height:52px;border-radius:16px;object-fit:cover;background:var(--bg3)}
+.logo-big{font-size:38px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .setup-step{width:100%;max-width:400px}
 .setup-step h2{font-size:20px;font-weight:700;margin-bottom:6px}
 .setup-step p{font-size:14px;color:var(--txt1);margin-bottom:22px;line-height:1.5}
 .field-label{font-size:13px;color:var(--txt2);margin-bottom:6px;display:block}
 .field-row{margin-bottom:14px}
 .color-picker-row{display:flex;gap:8px;flex-wrap:wrap}
-.color-swatch{width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s;flex-shrink:0}
+.color-swatch{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s;flex-shrink:0}
 .color-swatch.selected{border-color:#fff;transform:scale(1.15)}
-
-/* ── SETUP STEPPER ── */
 .setup-progress{display:flex;gap:6px;margin-bottom:28px}
 .setup-dot{width:6px;height:6px;border-radius:3px;background:var(--bg4);transition:.3s}
 .setup-dot.active{width:20px;background:var(--accent)}
 .setup-dot.done{background:var(--accent)}
 
-/* ── DASHBOARD ── */
-.balance-hero{
-  margin:16px;
-  background:linear-gradient(135deg,rgba(124,110,245,.15),rgba(90,79,212,.08));
-  border:1px solid rgba(124,110,245,.25);
-  border-radius:var(--rad);padding:20px;
-}
+/* HOME */
+.balance-hero{margin:16px;background:linear-gradient(135deg,rgba(124,110,245,.15),rgba(90,79,212,.08));border:1px solid rgba(124,110,245,.25);border-radius:var(--rad);padding:20px}
 .balance-hero-label{font-size:12px;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
 .balance-hero-amount{font-size:36px;font-weight:800;letter-spacing:-1px}
 .balance-hero-sub{font-size:13px;color:var(--txt1);margin-top:4px}
@@ -125,94 +97,58 @@ textarea{resize:vertical;min-height:80px}
 .person-name{font-size:15px;font-weight:500;flex:1}
 .person-amount{font-size:15px;font-weight:600}
 .quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 14px}
-.qa-btn{
-  background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);
-  padding:14px;display:flex;flex-direction:column;gap:6px;transition:.15s;
-}
+.qa-btn{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);padding:14px;display:flex;flex-direction:column;gap:6px;transition:.15s}
 .qa-btn:active{background:var(--bg3)}
 .qa-btn svg{width:22px;height:22px;stroke:var(--accent);stroke-width:1.7}
 .qa-btn span{font-size:13px;font-weight:500}
 .recent-label{font-size:13px;color:var(--txt2);padding:0 20px 8px;font-weight:500}
-.ticket-item{display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid var(--brd)}
-.ticket-icon{width:38px;height:38px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ticket-icon svg{width:18px;height:18px;stroke:var(--txt1);stroke-width:1.7}
+.ticket-item{display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid var(--brd);cursor:pointer}
+.ticket-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ticket-icon svg{width:18px;height:18px;stroke-width:1.7}
 .ticket-info{flex:1;min-width:0}
 .ticket-store{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ticket-date{font-size:12px;color:var(--txt2);margin-top:1px}
 .ticket-amount{font-size:15px;font-weight:600;text-align:right}
 .ticket-payer{font-size:11px;color:var(--txt2);text-align:right;margin-top:1px}
 
-/* ── TICKET MODULE ── */
-.upload-zone{
-  margin:16px;border:2px dashed var(--brd);border-radius:var(--rad);
-  padding:36px 20px;text-align:center;cursor:pointer;transition:.2s;
-}
+/* TICKETS */
+.upload-zone{margin:16px;border:2px dashed var(--brd);border-radius:var(--rad);padding:36px 20px;text-align:center;cursor:pointer;transition:.2s}
 .upload-zone:active,.upload-zone.drag{border-color:var(--accent);background:rgba(124,110,245,.06)}
 .upload-zone svg{width:36px;height:36px;stroke:var(--txt2);stroke-width:1.5;margin:0 auto 10px}
 .upload-zone h3{font-size:16px;font-weight:600;margin-bottom:4px}
 .upload-zone p{font-size:13px;color:var(--txt2)}
 .upload-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px}
 
-/* ── TICKET EDITOR ── */
+/* TICKET EDITOR */
 .ticket-editor{position:fixed;inset:0;z-index:200;background:var(--bg0);display:flex;flex-direction:column}
-.te-header{
-  padding:52px 16px 14px;border-bottom:1px solid var(--brd);
-  background:rgba(13,13,15,.92);backdrop-filter:blur(18px);
-  display:flex;align-items:center;gap:12px;
-}
+.te-header{padding:52px 16px 14px;border-bottom:1px solid var(--brd);background:rgba(13,13,15,.92);backdrop-filter:blur(18px);display:flex;align-items:center;gap:12px}
 .te-header h2{flex:1;font-size:17px;font-weight:700}
 .te-body{flex:1;overflow-y:auto;padding:16px}
 .te-section{margin-bottom:20px}
 .te-section-title{font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;font-weight:600}
-.product-row{
-  background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad-sm);
-  margin-bottom:8px;padding:12px 14px;
-}
+.product-row{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad-sm);margin-bottom:8px;padding:12px 14px}
 .product-top{display:flex;align-items:flex-start;gap:10px}
 .product-name-wrap{flex:1;min-width:0}
-.product-name{font-size:14px;font-weight:500;margin-bottom:2px}
 .product-name-raw{font-size:11px;color:var(--txt3)}
-.product-price{font-size:15px;font-weight:700;white-space:nowrap}
 .product-bottom{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-.assign-btn{
-  display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;
-  font-size:12px;font-weight:600;border:1.5px solid transparent;cursor:pointer;transition:.15s;
-}
-.share-btn{
-  padding:5px 10px;border-radius:20px;font-size:12px;border:1px solid var(--brd);color:var(--txt2);cursor:pointer;transition:.15s;
-}
+.assign-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid transparent;cursor:pointer;transition:.15s}
+.share-btn{padding:5px 10px;border-radius:20px;font-size:12px;border:1px solid var(--brd);color:var(--txt2);cursor:pointer;transition:.15s}
 .share-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(124,110,245,.1)}
-.confidence-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.confidence-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:6px}
 .conf-high{background:var(--green)}
 .conf-mid{background:var(--amber)}
 .conf-low{background:var(--red)}
-.te-footer{
-  padding:12px 16px max(12px,env(safe-area-inset-bottom));
-  border-top:1px solid var(--brd);background:var(--bg1);
-  display:flex;gap:10px;
-}
+.te-footer{padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--brd);background:var(--bg1);display:flex;gap:10px}
 
-/* ── OCR LOADING ── */
-.ocr-loading{
-  position:fixed;inset:0;z-index:300;background:rgba(13,13,15,.88);
-  backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
-}
-.spinner{
-  width:48px;height:48px;border:3px solid var(--bg4);border-top-color:var(--accent);
-  border-radius:50%;animation:spin .8s linear infinite;
-}
+/* OCR LOADING */
+.ocr-loading{position:fixed;inset:0;z-index:300;background:rgba(13,13,15,.92);backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.spinner{width:48px;height:48px;border:3px solid var(--bg4);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.ocr-status{font-size:14px;color:var(--txt1);text-align:center;max-width:240px}
-
-/* ── ERROR CHIPS ── */
-.error-chip{
-  display:flex;align-items:center;gap:8px;
-  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);
-  border-radius:var(--rad-xs);padding:8px 12px;margin-bottom:8px;font-size:13px;color:#f59e0b;
-}
+.ocr-status{font-size:14px;color:var(--txt1);text-align:center;max-width:260px;line-height:1.5}
+.error-chip{display:flex;align-items:center;gap:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:var(--rad-xs);padding:8px 12px;margin-bottom:8px;font-size:13px;color:#f59e0b}
 .error-chip button{margin-left:auto;font-size:12px;color:var(--txt2);background:var(--bg3);padding:3px 8px;border-radius:4px}
 
-/* ── MANUAL EXPENSE ── */
+/* MANUAL EXPENSE */
 .me-sheet{position:fixed;inset:0;z-index:200;background:var(--bg0);display:flex;flex-direction:column}
 .me-header{padding:52px 16px 14px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:12px}
 .me-header h2{flex:1;font-size:17px;font-weight:700}
@@ -223,54 +159,33 @@ textarea{resize:vertical;min-height:80px}
 .split-pct{font-size:20px;font-weight:700}
 .split-slider{flex:2}
 
-/* ── BALANCE ── */
-.balance-card{
-  margin:16px;
-  background:linear-gradient(135deg,rgba(62,207,142,.12),rgba(74,158,255,.08));
-  border:1px solid rgba(62,207,142,.2);
-  border-radius:var(--rad);padding:20px;
-}
+/* BALANCE */
+.balance-card{margin:16px;background:linear-gradient(135deg,rgba(62,207,142,.12),rgba(74,158,255,.08));border:1px solid rgba(62,207,142,.2);border-radius:var(--rad);padding:20px}
 .bc-owes{font-size:16px;font-weight:600;margin-bottom:4px}
 .bc-amount{font-size:40px;font-weight:800;letter-spacing:-1px;color:var(--green)}
 .bc-detail{font-size:13px;color:var(--txt1);margin-top:6px}
-.settle-btn{
-  margin:0 16px 14px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
-  color:#fff;border-radius:var(--rad-sm);padding:14px;
-  font-size:16px;font-weight:700;width:calc(100% - 32px);
-  text-align:center;transition:.15s;display:block;
-}
+.settle-btn{margin:0 16px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:var(--rad-sm);padding:14px;font-size:16px;font-weight:700;width:calc(100% - 32px);text-align:center;transition:.15s;display:block}
 .settle-btn:active{opacity:.8;transform:scale(.98)}
 .history-settle{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--brd)}
 .settle-date{font-size:13px;color:var(--txt2);flex:1}
 .settle-info{font-size:13px;text-align:right}
 
-/* ── STATS ── */
+/* STATS */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 14px}
 .stat-card{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:14px}
 .stat-label{font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
 .stat-value{font-size:22px;font-weight:800;letter-spacing:-.5px}
 .bar-chart{margin:0 16px 14px}
 .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.bar-name{font-size:13px;color:var(--txt1);width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-name{font-size:13px;color:var(--txt1);width:100px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
 .bar-fill{height:100%;border-radius:4px;transition:width .6s}
 .bar-amt{font-size:13px;font-weight:600;width:60px;text-align:right;flex-shrink:0}
 
-/* ── AI CHAT ── */
-.ai-chat-btn{
-  position:fixed;bottom:90px;right:20px;z-index:90;
-  width:52px;height:52px;border-radius:50%;
-  background:var(--accent);box-shadow:0 4px 20px rgba(124,110,245,.4);
-  display:flex;align-items:center;justify-content:center;
-  font-size:22px;font-weight:800;color:#fff;transition:.15s;
-}
+/* AI CHAT */
+.ai-chat-btn{position:fixed;bottom:90px;right:20px;z-index:90;width:52px;height:52px;border-radius:50%;background:var(--accent);box-shadow:0 4px 20px rgba(124,110,245,.4);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;transition:.15s}
 .ai-chat-btn:active{transform:scale(.92)}
-.ai-badge{
-  position:absolute;top:-3px;right:-3px;width:16px;height:16px;
-  background:var(--red);border-radius:50%;font-size:10px;font-weight:700;color:#fff;
-  display:flex;align-items:center;justify-content:center;
-}
+.ai-badge{position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:var(--red);border-radius:50%;font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center}
 .ai-sheet{position:fixed;inset:0;z-index:500;background:var(--bg0);display:flex;flex-direction:column}
 .ai-header{padding:52px 16px 14px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:12px}
 .ai-header h2{flex:1;font-size:17px;font-weight:700}
@@ -288,88 +203,50 @@ textarea{resize:vertical;min-height:80px}
 .ai-send{width:40px;height:40px;background:var(--accent);border-radius:var(--rad-xs);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ai-send svg{width:18px;height:18px;stroke:#fff;stroke-width:2}
 
-/* ── SETTINGS ── */
+/* SETTINGS */
 .settings-section{margin-bottom:24px}
 .settings-section-title{font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;padding:0 20px 8px;font-weight:600}
-.settings-row{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--brd)}
+.settings-row{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--brd);cursor:pointer}
 .settings-row:last-child{border-bottom:none}
 .settings-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .settings-icon svg{width:18px;height:18px;stroke:#fff;stroke-width:1.8}
 .settings-label{flex:1;font-size:15px}
 .settings-value{font-size:14px;color:var(--txt2)}
 .settings-arrow{color:var(--txt3)}
-
-/* ── MODAL/SHEET ── */
-.modal-overlay{
-  position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.65);
-  display:flex;align-items:flex-end;
-}
-.modal-sheet{
-  background:var(--bg1);border-radius:20px 20px 0 0;width:100%;
-  padding:20px 20px max(20px,env(safe-area-inset-bottom));
-  animation:slideUp .25s ease;
-}
+.modal-overlay{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end}
+.modal-sheet{background:var(--bg1);border-radius:20px 20px 0 0;width:100%;padding:20px 20px max(20px,env(safe-area-inset-bottom));animation:slideUp .25s ease;max-height:85vh;overflow-y:auto}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .modal-handle{width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:0 auto 16px}
 .modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
-
-/* ── TOAST ── */
-.toast{
-  position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:600;
-  background:var(--bg3);border:1px solid var(--brd);border-radius:var(--rad-sm);
-  padding:10px 18px;font-size:14px;font-weight:500;
-  animation:toastIn .25s ease;pointer-events:none;white-space:nowrap;
-}
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:600;background:var(--bg3);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:10px 18px;font-size:14px;font-weight:500;animation:toastIn .25s ease;pointer-events:none;white-space:nowrap}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-
-/* ── PREDICTIONS ── */
-.pred-card{
-  background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);
-  padding:14px 16px;margin:0 16px 10px;display:flex;align-items:center;gap:12px;
-}
-.pred-icon{font-size:24px}
+.pred-card{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);padding:14px 16px;margin:0 16px 10px;display:flex;align-items:center;gap:12px}
 .pred-info{flex:1}
 .pred-name{font-size:14px;font-weight:600}
 .pred-detail{font-size:12px;color:var(--txt2);margin-top:2px}
 .pred-days{font-size:13px;font-weight:700;color:var(--amber)}
-
-/* ── INVENTORY ── */
 .inv-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--brd)}
 .inv-bar-track{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
 .inv-bar-fill{height:100%;border-radius:3px}
 .inv-name{font-size:14px;flex-shrink:0;width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .inv-days{font-size:12px;color:var(--txt2);width:50px;text-align:right;flex-shrink:0}
-
-/* ── CATEGORY ICONS ── */
-.cat-icon{font-size:20px}
-
-/* ── PERSON DISPLAY ── */
-.person-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600}
-
-/* ── HIDDEN FILE INPUT ── */
-#file-input{display:none}
-#camera-input{display:none}
-
-/* ── SWIPE HINT ── */
 .empty-state{text-align:center;padding:60px 30px;color:var(--txt2)}
 .empty-state svg{width:48px;height:48px;stroke:var(--txt3);margin:0 auto 14px;display:block}
 .empty-state h3{font-size:17px;font-weight:600;color:var(--txt1);margin-bottom:6px}
 .empty-state p{font-size:14px;line-height:1.6}
+#file-input,#camera-input{display:none}
 </style>
 </head>
 <body>
 
-<!-- HIDDEN FILE INPUTS -->
 <input type="file" id="file-input" accept="image/*,application/pdf"/>
 <input type="file" id="camera-input" accept="image/*" capture="environment"/>
 
-<!-- AI CHAT BUTTON (floating) -->
-<button class="ai-chat-btn" id="ai-chat-btn" onclick="openAIChat()" aria-label="Asistente IA">
+<button class="ai-chat-btn" id="ai-chat-btn" onclick="openAIChat()" aria-label="Asistente IA" style="position:fixed">
   ?
-  <span class="ai-badge" id="ai-badge" style="display:none" id="ai-pending-badge">0</span>
+  <span class="ai-badge" id="ai-badge" style="display:none">0</span>
 </button>
 
-<!-- MAIN APP -->
 <div id="app">
   <div id="view"></div>
   <nav id="nav">
@@ -396,23 +273,19 @@ textarea{resize:vertical;min-height:80px}
   </nav>
 </div>
 
-<!-- SETUP SCREEN -->
 <div id="setup-screen">
-  <div class="logo-big">Clarito</div>
-  <p style="color:var(--txt2);font-size:14px;margin-bottom:32px">Tu hogar, sin cuentas pendientes</p>
+  <div class="logo-wrap">
+    <img class="logo-img" src="https://static.thenounproject.com/png/robot-icon-8195198-512.png" alt="Clarito logo" onerror="this.style.display='none'"/>
+    <div class="logo-big">Clarito</div>
+  </div>
+  <p style="color:var(--txt2);font-size:13px;margin-bottom:32px;text-align:center">La contabilidad doméstica casi invisible</p>
   <div id="setup-content" class="setup-step"></div>
 </div>
 
-<!-- TICKET EDITOR (fullscreen) -->
 <div id="ticket-editor" class="ticket-editor" style="display:none"></div>
-
-<!-- MANUAL EXPENSE SHEET -->
 <div id="me-sheet" class="me-sheet" style="display:none"></div>
-
-<!-- AI CHAT SHEET -->
 <div id="ai-chat-sheet" class="ai-sheet" style="display:none"></div>
 
-<!-- MODAL OVERLAY -->
 <div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal()">
   <div id="modal-sheet" class="modal-sheet" onclick="event.stopPropagation()">
     <div class="modal-handle"></div>
@@ -420,7 +293,6 @@ textarea{resize:vertical;min-height:80px}
   </div>
 </div>
 
-<!-- OCR LOADING -->
 <div id="ocr-loading" class="ocr-loading" style="display:none">
   <div class="spinner"></div>
   <div class="ocr-status" id="ocr-status">Analizando imagen...</div>
@@ -428,145 +300,141 @@ textarea{resize:vertical;min-height:80px}
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-//  CLARITO — App Engine
+//  CLARITO v2 — App Engine
 // ═══════════════════════════════════════════════════════════════
 
-// ── STATE ──────────────────────────────────────────────────────
 const S = {
   get(k){try{const v=localStorage.getItem('clarito_'+k);return v?JSON.parse(v):null}catch(e){return null}},
   set(k,v){localStorage.setItem('clarito_'+k,JSON.stringify(v))},
-  del(k){localStorage.removeItem('clarito_'+k)}
 };
 
+const PRESET_COLORS = [
+  '#7c6ef5','#3ecf8e','#e5534b','#f59e0b','#4a9eff',
+  '#f472b6','#22d3ee','#a3e635','#fb923c','#e879f9',
+  '#34d399','#f87171','#60a5fa','#fbbf24','#a78bfa',
+  '#2dd4bf','#818cf8','#fb7185'
+];
+
 let DB = {
-  apiKey: '',
-  persons: [
-    {id:'p1',name:'Persona A',color:'#7c6ef5',cards:[]},
-    {id:'p2',name:'Persona B',color:'#3ecf8e',cards:[]}
+  apiKey:'',
+  persons:[
+    {id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},
+    {id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}
   ],
-  tickets: [],
-  expenses: [],
-  settlements: [],
-  knowledge: {
-    products:{},  // {normalizedName: {person,shared,pct,ocr_raw:[]}}
-    cards:{},     // {last4: personId}
-    anomalyBaseline:{}
-  },
-  aiQuestions: [],
-  aiConvMessages: []
+  tickets:[],expenses:[],settlements:[],
+  knowledge:{products:{},cards:{}},
+  aiQuestions:[],aiConvMessages:[]
 };
 
 function loadDB(){
-  const saved = S.get('db');
-  if(saved) DB = Object.assign({},DB,saved);
-  DB.apiKey = S.get('apiKey') || '';
+  const saved=S.get('db');
+  if(saved) DB=Object.assign({},DB,saved);
+  DB.apiKey=S.get('apiKey')||DB.apiKey||'';
+  if(!DB.knowledge) DB.knowledge={products:{},cards:{}};
+  if(!DB.aiQuestions) DB.aiQuestions=[];
+  if(!DB.aiConvMessages) DB.aiConvMessages=[];
 }
+function saveDB(){S.set('db',DB);}
 
-function saveDB(){
-  S.set('db', DB);
-}
+// ── SETUP ──────────────────────────────────────────────────────
+let setupStep=0, setupPersonCount=2;
 
-// ── SETUP WIZARD ───────────────────────────────────────────────
-const PRESET_COLORS = ['#7c6ef5','#3ecf8e','#e5534b','#f59e0b','#4a9eff','#f472b6','#22d3ee','#a3e635','#fb923c'];
-let setupStep = 0;
-
-function startSetup(){
-  setupStep = 0;
-  renderSetupStep();
-}
+function startSetup(){setupStep=0;renderSetupStep();}
 
 function renderSetupStep(){
-  const el = document.getElementById('setup-content');
-  const dots = Array.from({length:4},(_,i)=>`<div class="setup-dot ${i===setupStep?'active':i<setupStep?'done':''}"></div>`).join('');
-  let html = `<div class="setup-progress">${dots}</div>`;
+  const el=document.getElementById('setup-content');
+  const steps=4;
+  const dots=Array.from({length:steps},(_,i)=>`<div class="setup-dot ${i===setupStep?'active':i<setupStep?'done':''}"></div>`).join('');
+  let html=`<div class="setup-progress">${dots}</div>`;
 
   if(setupStep===0){
     html+=`
       <h2>Bienvenido a Clarito</h2>
-      <p>Vamos a configurar la app en un momento. Primero necesitas una API Key de Google AI Studio (gratuita).</p>
+      <p>Necesitas una API Key de Google AI Studio para analizar tickets con IA. Es <strong>completamente gratuita</strong>.</p>
       <div class="field-row">
-        <label class="field-label">API Key de Google Gemini</label>
+        <label class="field-label">API Key de Gemini</label>
         <input type="password" id="s-apikey" placeholder="AIza..." value="${DB.apiKey||''}"/>
       </div>
-      <p style="font-size:12px;color:var(--txt2);margin-bottom:20px">
-        Obtén tu key gratis en <strong>aistudio.google.com</strong> → Get API Key
-      </p>
-      <button class="btn-primary" onclick="setupNext0()">Continuar</button>
+      <p style="font-size:12px;color:var(--txt2);margin-bottom:20px">Obtén tu key en <strong style="color:var(--accent)">aistudio.google.com</strong> → Get API Key (gratuito)</p>
+      <button class="btn-primary" onclick="setupNext0()">Continuar →</button>
     `;
   } else if(setupStep===1){
     html+=`
-      <h2>¿Cómo te llamas?</h2>
-      <p>Introduce los nombres de las dos personas de la vivienda.</p>
-      <div class="field-row">
-        <label class="field-label">Persona 1</label>
-        <input id="s-name1" placeholder="Nombre..." value="${DB.persons[0].name!=='Persona A'?DB.persons[0].name:''}"/>
+      <h2>¿Cuántas personas?</h2>
+      <p>¿Cuántas personas vivirán y compartirán gastos en este hogar?</p>
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+        ${[2,3,4,5].map(n=>`
+          <button onclick="setupPersonCount=${n};document.querySelectorAll('.pc-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')" 
+            class="btn-secondary pc-btn ${setupPersonCount===n?'active':''}" 
+            style="${setupPersonCount===n?'background:var(--accent)33;color:var(--accent);border-color:var(--accent)':''}">
+            ${n} personas
+          </button>
+        `).join('')}
       </div>
-      <div class="field-row">
-        <label class="field-label">Persona 2</label>
-        <input id="s-name2" placeholder="Nombre..." value="${DB.persons[1].name!=='Persona B'?DB.persons[1].name:''}"/>
-      </div>
-      <button class="btn-primary" onclick="setupNext1()">Continuar</button>
+      <button class="btn-primary" onclick="setupNext1()">Continuar →</button>
     `;
   } else if(setupStep===2){
+    // Ensure persons array has right length
+    while(DB.persons.length < setupPersonCount){
+      const idx=DB.persons.length;
+      DB.persons.push({id:'p'+(idx+1),name:'Persona '+(idx+1),color:PRESET_COLORS[idx%PRESET_COLORS.length],cards:[]});
+    }
+    DB.persons=DB.persons.slice(0,setupPersonCount);
     html+=`
-      <h2>Elige colores</h2>
-      <p>Cada persona tendrá un color para identificarse visualmente.</p>
-      <div class="field-row">
-        <label class="field-label">${DB.persons[0].name}</label>
-        <div class="color-picker-row" id="cp1">
-          ${PRESET_COLORS.map(c=>`<div class="color-swatch ${DB.persons[0].color===c?'selected':''}" style="background:${c}" onclick="pickColor(0,'${c}')"></div>`).join('')}
+      <h2>Nombres y colores</h2>
+      <p>Ponle nombre y color a cada persona del hogar.</p>
+      ${DB.persons.map((p,i)=>`
+        <div style="background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:12px 14px;margin-bottom:10px">
+          <div class="field-row">
+            <label class="field-label">Nombre persona ${i+1}</label>
+            <input id="s-name-${i}" value="${p.name!==('Persona '+(i+1))?p.name:''}" placeholder="Nombre..."/>
+          </div>
+          <div style="margin-top:8px">
+            <label class="field-label">Color</label>
+            <div class="color-picker-row" id="cp-${i}">
+              ${PRESET_COLORS.map(c=>`<div class="color-swatch ${p.color===c?'selected':''}" style="background:${c}" onclick="pickColor(${i},'${c}',this)"></div>`).join('')}
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="field-row" style="margin-top:14px">
-        <label class="field-label">${DB.persons[1].name}</label>
-        <div class="color-picker-row" id="cp2">
-          ${PRESET_COLORS.map(c=>`<div class="color-swatch ${DB.persons[1].color===c?'selected':''}" style="background:${c}" onclick="pickColor(1,'${c}')"></div>`).join('')}
-        </div>
-      </div>
-      <button class="btn-primary" style="margin-top:20px" onclick="setupNext2()">Continuar</button>
+      `).join('')}
+      <button class="btn-primary" style="margin-top:10px" onclick="setupNext2()">Continuar →</button>
     `;
   } else if(setupStep===3){
     html+=`
       <h2>¡Todo listo!</h2>
-      <p>Clarito está configurado. Puedes empezar a subir tickets y hacer seguimiento de gastos compartidos.</p>
+      <p>Clarito está configurado para <strong>${DB.persons.length} personas</strong>.</p>
       <div style="background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);padding:16px;margin-bottom:20px">
-        <div style="display:flex;gap:12px;margin-bottom:10px">
-          <div style="width:12px;height:12px;border-radius:50%;background:${DB.persons[0].color};margin-top:4px;flex-shrink:0"></div>
-          <div><div style="font-weight:600">${DB.persons[0].name}</div><div style="font-size:12px;color:var(--txt2)">${DB.persons[0].color}</div></div>
-        </div>
-        <div style="display:flex;gap:12px">
-          <div style="width:12px;height:12px;border-radius:50%;background:${DB.persons[1].color};margin-top:4px;flex-shrink:0"></div>
-          <div><div style="font-weight:600">${DB.persons[1].name}</div><div style="font-size:12px;color:var(--txt2)">${DB.persons[1].color}</div></div>
-        </div>
+        ${DB.persons.map(p=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--brd)">
+            <div style="width:12px;height:12px;border-radius:50%;background:${p.color};flex-shrink:0"></div>
+            <div style="font-weight:600">${p.name}</div>
+          </div>
+        `).join('')}
       </div>
-      <button class="btn-primary" onclick="finishSetup()">Empezar a usar Clarito</button>
+      <button class="btn-primary" onclick="finishSetup()">Empezar a usar Clarito ✦</button>
     `;
   }
-  el.innerHTML = html;
+  el.innerHTML=html;
 }
 
-function pickColor(personIdx, color){
-  DB.persons[personIdx].color = color;
-  document.querySelectorAll(`#cp${personIdx+1} .color-swatch`).forEach(s=>s.classList.remove('selected'));
-  event.target.classList.add('selected');
+function pickColor(idx,color,el){
+  DB.persons[idx].color=color;
+  document.querySelectorAll(`#cp-${idx} .color-swatch`).forEach(s=>s.classList.remove('selected'));
+  el.classList.add('selected');
 }
-
 function setupNext0(){
-  const key = document.getElementById('s-apikey').value.trim();
+  const key=document.getElementById('s-apikey').value.trim();
   if(!key){showToast('Introduce tu API key de Gemini');return;}
-  DB.apiKey = key;
-  S.set('apiKey', key);
-  setupStep=1; renderSetupStep();
+  DB.apiKey=key; S.set('apiKey',key);
+  setupStep=1;renderSetupStep();
 }
-function setupNext1(){
-  const n1 = document.getElementById('s-name1').value.trim()||'Persona A';
-  const n2 = document.getElementById('s-name2').value.trim()||'Persona B';
-  DB.persons[0].name = n1;
-  DB.persons[1].name = n2;
-  setupStep=2; renderSetupStep();
-}
+function setupNext1(){setupStep=2;renderSetupStep();}
 function setupNext2(){
-  setupStep=3; renderSetupStep();
+  DB.persons.forEach((p,i)=>{
+    const n=document.getElementById('s-name-'+i);
+    if(n&&n.value.trim()) p.name=n.value.trim();
+  });
+  setupStep=3;renderSetupStep();
 }
 function finishSetup(){
   saveDB();
@@ -575,95 +443,191 @@ function finishSetup(){
 }
 
 // ── NAVIGATION ─────────────────────────────────────────────────
-let currentScreen = 'home';
-
+let currentScreen='home';
 function showScreen(name){
-  currentScreen = name;
+  currentScreen=name;
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const nb = document.getElementById('nav-'+name);
-  if(nb) nb.classList.add('active');
-  const view = document.getElementById('view');
-  view.scrollTop = 0;
-
-  const screens = {
-    home: renderHome,
-    tickets: renderTickets,
-    balance: renderBalance,
-    stats: renderStats,
-    settings: renderSettings
-  };
-  if(screens[name]) screens[name]();
+  const nb=document.getElementById('nav-'+name);
+  if(nb)nb.classList.add('active');
+  document.getElementById('view').scrollTop=0;
+  ({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();
   updateAIBadge();
 }
 
 // ── HELPERS ────────────────────────────────────────────────────
-function fmt(n){
-  if(isNaN(n)||n===null||n===undefined) return '0,00 €';
-  return Number(n).toFixed(2).replace('.',',') + ' €';
-}
-function fmtDate(d){
-  if(!d) return '';
-  const dt = new Date(d);
-  if(isNaN(dt)) return d;
-  return dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
-}
+function fmt(n){return isNaN(n)||n==null?'0,00 €':Number(n).toFixed(2).replace('.',',')+' €';}
+function fmtDate(d){if(!d)return '';const dt=new Date(d);return isNaN(dt)?d:dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
-function showToast(msg, duration=2500){
-  const existing = document.querySelector('.toast');
-  if(existing) existing.remove();
-  const t = document.createElement('div');
-  t.className='toast';t.textContent=msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), duration);
-}
+function showToast(msg,dur=2500){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
 function personById(id){return DB.persons.find(p=>p.id===id)}
-function personColor(id){const p=personById(id);return p?p.color:'#888'}
-function personName(id){const p=personById(id);return p?p.name:'?'}
+function personColor(id){return personById(id)?.color||'#888'}
+function personName(id){return personById(id)?.name||'?'}
+function openModal(html){document.getElementById('modal-content').innerHTML=html;document.getElementById('modal-overlay').style.display='flex';}
+function closeModal(){document.getElementById('modal-overlay').style.display='none';}
+function normalizeKey(name){return name.toLowerCase().replace(/[^a-záéíóúñ0-9]/g,' ').replace(/\s+/g,' ').trim();}
 
-function openModal(html){
-  document.getElementById('modal-content').innerHTML = html;
-  document.getElementById('modal-overlay').style.display = 'flex';
+// ── IMAGE COMPRESSION ──────────────────────────────────────────
+function compressImage(file, maxW=800, quality=0.7){
+  return new Promise((res,rej)=>{
+    if(file.type==='application/pdf'){
+      // PDFs sent as-is (smaller)
+      const r=new FileReader();
+      r.onload=()=>res({data:r.result.split(',')[1],mime:'application/pdf'});
+      r.onerror=()=>rej(new Error('Error leyendo PDF'));
+      r.readAsDataURL(file);
+      return;
+    }
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width,h=img.height;
+      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const dataURL=canvas.toDataURL('image/jpeg',quality);
+      res({data:dataURL.split(',')[1],mime:'image/jpeg'});
+    };
+    img.onerror=()=>rej(new Error('Error procesando imagen'));
+    img.src=url;
+  });
 }
-function closeModal(){
-  document.getElementById('modal-overlay').style.display = 'none';
-}
 
-// ── HOME SCREEN ────────────────────────────────────────────────
-function renderHome(){
-  const {p1balance, p2balance, owes, amount} = calcBalance();
-  const recentTickets = [...DB.tickets, ...DB.expenses]
-    .sort((a,b)=>new Date(b.date)-new Date(a.date))
-    .slice(0,6);
+// ── GEMINI API ─────────────────────────────────────────────────
+async function callGemini(prompt, imgData, mimeType){
+  const key=DB.apiKey;
+  if(!key) throw new Error('No hay API key. Ve a Configuración.');
 
-  const p1 = DB.persons[0], p2 = DB.persons[1];
+  const parts=[];
+  if(imgData&&mimeType) parts.push({inline_data:{mime_type:mimeType,data:imgData}});
+  parts.push({text:prompt});
 
-  document.getElementById('view').innerHTML = `
-    <div class="screen-header">
-      <h1>Clarito ✦</h1>
-      <p>Hogar compartido · ${new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</p>
-    </div>
+  const body={
+    contents:[{role:'user',parts}],
+    generationConfig:{temperature:0.1,maxOutputTokens:2048}
+  };
 
-    <div class="balance-hero">
-      <div class="balance-hero-label">Balance actual</div>
-      ${amount===0
-        ? `<div class="balance-hero-amount" style="color:var(--green)">✓ Cuentas al día</div>`
-        : `<div class="balance-hero-amount" style="color:var(--amber)">${fmt(amount)}</div>
-           <div class="balance-hero-sub">${personName(owes)} → ${personName(owes===p1.id?p2.id:p1.id)}</div>`
+  // Try lite model first (more generous quota), fallback to flash
+  const models=['gemini-2.0-flash-lite','gemini-2.0-flash'];
+
+  for(const model of models){
+    for(let attempt=0;attempt<3;attempt++){
+      const res=await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
+      );
+      if(res.status===429){
+        const wait=(attempt+1)*20000;
+        setOCRStatus(`Límite de peticiones (${model}).\nEsperando ${wait/1000}s antes de reintentar...`);
+        await new Promise(r=>setTimeout(r,wait));
+        continue;
       }
-      <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px">
-        <div class="person-row">
-          <div class="person-dot" style="background:${p1.color}"></div>
-          <div class="person-name">${p1.name}</div>
-          <div class="person-amount">${fmt(p1balance)}</div>
-        </div>
-        <div class="person-row">
-          <div class="person-dot" style="background:${p2.color}"></div>
-          <div class="person-name">${p2.name}</div>
-          <div class="person-amount">${fmt(p2balance)}</div>
+      if(res.status===404){break;} // try next model
+      if(!res.ok){
+        const err=await res.json().catch(()=>({}));
+        throw new Error(err.error?.message||`Error HTTP ${res.status}`);
+      }
+      const data=await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    }
+  }
+  throw new Error('No se pudo conectar con la API. Espera un minuto e inténtalo de nuevo.');
+}
+
+// ── TICKET PROCESSING ──────────────────────────────────────────
+async function processFile(file){
+  showOCRLoading('Comprimiendo imagen...');
+  try{
+    const {data,mime}=await compressImage(file);
+    setOCRStatus('Enviando a Gemini IA...');
+    const result=await analyzeTicketWithGemini(data,mime);
+    hideOCRLoading();
+    openTicketEditor(result);
+  }catch(err){
+    hideOCRLoading();
+    showToast('Error: '+err.message,4000);
+    openTicketEditor(getEmptyTicket());
+  }
+}
+
+async function analyzeTicketWithGemini(imgData, mime){
+  const knownProds=Object.entries(DB.knowledge.products).slice(0,8)
+    .map(([k,v])=>`${k}→${v.shared?'común':personName(v.person)}`).join(', ');
+
+  const prompt=`Analiza este ticket de supermercado. Devuelve SOLO JSON sin markdown ni texto extra:
+{"store":"","date":"YYYY-MM-DD o null","total":0,"last4":"4 dígitos o null","products":[{"rawName":"texto original","name":"nombre legible normalizado","price":0,"discount":0,"qty":1,"confidence":0.9,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|otro"}],"errors":[],"warnings":[]}
+Normaliza nombres (ej: SAL TO 500G→Salsa tomate 500g). Detecta descuentos. Confidence baja si hay dudas.${knownProds?` Productos conocidos: ${knownProds}`:''}`;
+
+  const text=await callGemini(prompt,imgData,mime);
+  try{
+    const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const parsed=JSON.parse(clean);
+    parsed.products=(parsed.products||[]).map(p=>applyKnowledgeToProduct(p));
+    parsed.type='ticket';parsed.id=uid();
+    parsed.payer=DB.persons[0].id;parsed.confirmed=false;
+    parsed.createdAt=new Date().toISOString();
+    if(parsed.last4&&DB.knowledge.cards[parsed.last4]) parsed.payer=DB.knowledge.cards[parsed.last4];
+    return parsed;
+  }catch(e){return getEmptyTicket();}
+}
+
+function applyKnowledgeToProduct(prod){
+  const key=normalizeKey(prod.name||prod.rawName||'');
+  const known=DB.knowledge.products[key];
+  if(known){
+    prod.assignedTo=known.shared?null:known.person;
+    prod.shared=known.shared; prod.pct1=known.pct1||50; prod.knownMatch=true;
+  } else {
+    const ocrKey=(prod.rawName||'').trim().toUpperCase();
+    const ocrMatch=Object.values(DB.knowledge.products).find(v=>v.ocr_raw?.includes(ocrKey));
+    if(ocrMatch){prod.assignedTo=ocrMatch.shared?null:ocrMatch.person;prod.shared=ocrMatch.shared;prod.pct1=ocrMatch.pct1||50;prod.knownMatch=true;}
+    else{prod.assignedTo=null;prod.shared=true;prod.pct1=50;}
+  }
+  prod.finalPrice=prod.price;
+  return prod;
+}
+
+function getEmptyTicket(){
+  return{id:uid(),type:'ticket',store:'',date:new Date().toISOString().slice(0,10),total:0,last4:null,payer:DB.persons[0].id,products:[],errors:[],warnings:[],confirmed:false,createdAt:new Date().toISOString()};
+}
+
+function showOCRLoading(msg){document.getElementById('ocr-loading').style.display='flex';document.getElementById('ocr-status').textContent=msg;}
+function setOCRStatus(msg){document.getElementById('ocr-status').textContent=msg;}
+function hideOCRLoading(){document.getElementById('ocr-loading').style.display='none';}
+
+// ── HOME ───────────────────────────────────────────────────────
+function renderHome(){
+  const bal=calcBalance();
+  const recent=[...DB.tickets,...DB.expenses].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
+
+  document.getElementById('view').innerHTML=`
+    <div class="screen-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <img src="https://static.thenounproject.com/png/robot-icon-8195198-512.png" style="width:28px;height:28px;border-radius:8px;object-fit:cover" onerror="this.style.display='none'"/>
+        <div>
+          <h1>Clarito ✦</h1>
+          <p>La contabilidad doméstica casi invisible</p>
         </div>
       </div>
     </div>
-
+    <div class="balance-hero">
+      <div class="balance-hero-label">Balance actual</div>
+      ${bal.amount<0.01
+        ?`<div class="balance-hero-amount" style="color:var(--green)">✓ Cuentas al día</div>`
+        :`<div class="balance-hero-amount" style="color:var(--amber)">${fmt(bal.amount)}</div>
+          <div class="balance-hero-sub">${personName(bal.owes)} debe a ${personName(bal.owes===DB.persons[0].id?DB.persons[1]?.id:DB.persons[0].id)}</div>`
+      }
+      <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px">
+        ${DB.persons.map(p=>`
+          <div class="person-row">
+            <div class="person-dot" style="background:${p.color}"></div>
+            <div class="person-name">${p.name}</div>
+            <div class="person-amount">${fmt(bal.paid[p.id]||0)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
     <div class="quick-actions">
       <button class="qa-btn" onclick="showScreen('tickets')">
         <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -679,1460 +643,625 @@ function renderHome(){
       </button>
       <button class="qa-btn" onclick="showScreen('balance')">
         <svg viewBox="0 0 24 24" fill="none"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-        <span>Ver balance</span>
+        <span>Balance</span>
       </button>
     </div>
-
     <div class="recent-label">Últimas actividades</div>
-    ${recentTickets.length===0?`
-      <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        <h3>Sin actividad todavía</h3>
-        <p>Sube tu primer ticket o añade un gasto manual para empezar</p>
-      </div>
-    `:recentTickets.map(t=>renderTicketListItem(t)).join('')}
-
+    ${recent.length===0?`<div class="empty-state"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/></svg><h3>Sin actividad todavía</h3><p>Sube tu primer ticket o añade un gasto manual</p></div>`
+      :recent.map(t=>renderTicketListItem(t)).join('')}
     ${renderPredictionsWidget()}
   `;
 }
 
 function renderTicketListItem(t){
-  const isTicket = t.type==='ticket';
-  const payer = personById(t.payer);
-  const color = payer?payer.color:'#888';
-  const icon = isTicket
-    ? `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
-    : `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
-
-  return `
-    <div class="ticket-item" onclick="editItem('${t.id}')">
-      <div class="ticket-icon" style="background:${color}22">${icon.replace('var(--txt1)',color)}</div>
-      <div class="ticket-info">
-        <div class="ticket-store">${t.store||t.category||'Gasto'}</div>
-        <div class="ticket-date">${fmtDate(t.date)}</div>
-      </div>
-      <div>
-        <div class="ticket-amount">${fmt(t.total)}</div>
-        <div class="ticket-payer">${payer?payer.name:''}</div>
-      </div>
+  const payer=personById(t.payer);
+  const color=payer?.color||'#888';
+  return`<div class="ticket-item" onclick="editItem('${t.id}')">
+    <div class="ticket-icon" style="background:${color}22">
+      <svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/></svg>
     </div>
-  `;
+    <div class="ticket-info">
+      <div class="ticket-store">${t.store||t.category||t.description||'Gasto'}</div>
+      <div class="ticket-date">${fmtDate(t.date)}</div>
+    </div>
+    <div>
+      <div class="ticket-amount">${fmt(t.total)}</div>
+      <div class="ticket-payer">${payer?.name||''}</div>
+    </div>
+  </div>`;
 }
 
 function renderPredictionsWidget(){
-  const preds = getPredictions().slice(0,2);
-  if(preds.length===0) return '';
-  return `
-    <div class="recent-label" style="margin-top:8px">Previsiones de compra</div>
-    ${preds.map(p=>`
-      <div class="pred-card">
-        <div class="pred-icon">${p.emoji}</div>
-        <div class="pred-info">
-          <div class="pred-name">${p.name}</div>
-          <div class="pred-detail">${p.detail}</div>
-        </div>
-        <div class="pred-days">~${p.days}d</div>
-      </div>
-    `).join('')}
-  `;
+  const preds=getPredictions().slice(0,2);
+  if(!preds.length) return '';
+  return`<div class="recent-label" style="margin-top:8px">Previsiones de compra</div>
+    ${preds.map(p=>`<div class="pred-card"><div style="font-size:24px">${p.emoji}</div><div class="pred-info"><div class="pred-name">${p.name}</div><div class="pred-detail">${p.detail}</div></div><div class="pred-days">~${p.days}d</div></div>`).join('')}`;
 }
 
-// ── BALANCE CALCULATION ────────────────────────────────────────
+// ── BALANCE CALC ───────────────────────────────────────────────
 function calcBalance(){
-  const p1=DB.persons[0], p2=DB.persons[1];
-  let p1paid=0, p2paid=0, p1owes=0, p2owes=0;
+  const paid={};
+  DB.persons.forEach(p=>paid[p.id]=0);
+  const owedTo={};
+  DB.persons.forEach(p=>owedTo[p.id]=0);
 
-  // Process tickets
-  DB.tickets.forEach(t=>{
-    if(!t.confirmed) return;
-    const payerIsP1 = t.payer===p1.id;
-    t.products && t.products.forEach(prod=>{
-      const price = parseFloat(prod.finalPrice||prod.price||0);
+  DB.tickets.filter(t=>t.confirmed).forEach(t=>{
+    const payerId=t.payer;
+    if(!paid[payerId]) paid[payerId]=0;
+    (t.products||[]).forEach(prod=>{
+      const price=parseFloat(prod.finalPrice||prod.price||0);
       if(isNaN(price)||price<=0) return;
-      if(prod.assignedTo===p1.id){
-        if(payerIsP1) p1paid+=price; else {p2paid+=price;p1owes+=price;}
-      } else if(prod.assignedTo===p2.id){
-        if(!payerIsP1) p2paid+=price; else {p1paid+=price;p2owes+=price;}
+      paid[payerId]=(paid[payerId]||0)+price;
+      if(prod.assignedTo){
+        // personal product — payer fronts it, person owes if different
+        if(prod.assignedTo!==payerId) owedTo[payerId]=(owedTo[payerId]||0)+price;
       } else {
         // shared
-        const pct1 = prod.pct1!==undefined ? prod.pct1 : 50;
-        const pct2 = 100 - pct1;
-        const share1 = price * pct1/100;
-        const share2 = price * pct2/100;
-        if(payerIsP1){p1paid+=price;p2owes+=share2;}
-        else{p2paid+=price;p1owes+=share1;}
+        DB.persons.forEach(p=>{
+          if(p.id===payerId) return;
+          const pct = prod.pct1!==undefined
+            ? (p.id===DB.persons[0].id ? prod.pct1 : 100-prod.pct1)
+            : 100/DB.persons.length;
+          owedTo[payerId]=(owedTo[payerId]||0)+price*pct/100;
+        });
       }
     });
   });
 
-  // Process manual expenses
-  DB.expenses.forEach(e=>{
-    if(!e.confirmed) return;
-    const amt = parseFloat(e.total||0);
-    if(isNaN(amt)||amt<=0) return;
-    const payerIsP1 = e.payer===p1.id;
-    const split1 = e.split1!==undefined ? e.split1 : 50;
-    const split2 = 100 - split1;
-    const share1 = amt * split1/100;
-    const share2 = amt * split2/100;
-    if(payerIsP1){p1paid+=amt;p2owes+=share2;}
-    else{p2paid+=amt;p1owes+=share1;}
+  DB.expenses.filter(e=>e.confirmed).forEach(e=>{
+    const amt=parseFloat(e.total||0);if(isNaN(amt)||amt<=0) return;
+    const payerId=e.payer;
+    paid[payerId]=(paid[payerId]||0)+amt;
+    const split1=e.split1!==undefined?e.split1:100/DB.persons.length;
+    DB.persons.forEach((p,i)=>{
+      if(p.id===payerId) return;
+      const pct=i===0?split1:100-split1;
+      owedTo[payerId]=(owedTo[payerId]||0)+amt*pct/100;
+    });
   });
 
-  const net = p1owes - p2owes; // positive = p1 owes more than p2
-  const p1balance = p1paid;
-  const p2balance = p2paid;
-  let owes=null, amount=0;
-  if(net>0.005){owes=p1.id;amount=net;}
-  else if(net<-0.005){owes=p2.id;amount=-net;}
+  // Net: find who owes whom
+  // For 2 persons: simple net
+  let owes=null,amount=0;
+  if(DB.persons.length===2){
+    const n=( owedTo[DB.persons[0].id]||0)-(owedTo[DB.persons[1].id]||0);
+    if(n>0.005){owes=DB.persons[1].id;amount=n;}
+    else if(n<-0.005){owes=DB.persons[0].id;amount=-n;}
+  }
 
-  return {p1balance,p2balance,owes,amount};
+  return {paid,owes,amount};
 }
 
 // ── TICKETS SCREEN ─────────────────────────────────────────────
 function renderTickets(){
-  const tickets = DB.tickets.slice().reverse();
-  document.getElementById('view').innerHTML = `
-    <div class="screen-header">
-      <h1>Tickets</h1>
-      <p>${tickets.length} tickets registrados</p>
-    </div>
-
-    <div class="upload-zone" id="upload-zone" onclick="showUploadOptions()">
+  const tickets=DB.tickets.slice().reverse();
+  document.getElementById('view').innerHTML=`
+    <div class="screen-header"><h1>Tickets</h1><p>${tickets.length} registrados</p></div>
+    <div class="upload-zone" onclick="showUploadOptions()">
       <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3"/><polyline points="12 8 12 16"/><polyline points="8 12 12 8 16 12"/></svg>
-      <h3>Subir ticket</h3>
-      <p>Foto, PDF o imagen desde galería</p>
+      <h3>Subir ticket</h3><p>Foto, PDF o galería</p>
     </div>
-
     <div class="upload-actions">
       <button class="btn-secondary" onclick="triggerCamera()">📷 Cámara</button>
       <button class="btn-secondary" onclick="openManualTicket()">✏️ Manual</button>
     </div>
-
     <div style="height:16px"></div>
-    ${tickets.length===0?`
-      <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/></svg>
-        <h3>Sin tickets todavía</h3>
-        <p>Sube una foto de un ticket para empezar</p>
-      </div>
-    `:tickets.map(t=>renderTicketListItem(t)).join('')}
+    ${tickets.length===0?`<div class="empty-state"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/></svg><h3>Sin tickets todavía</h3><p>Sube una foto para empezar</p></div>`
+      :tickets.map(t=>renderTicketListItem(t)).join('')}
   `;
-
-  // Drag and drop
-  const zone = document.getElementById('upload-zone');
+  const zone=document.querySelector('.upload-zone');
   if(zone){
     zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag')});
     zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
-    zone.addEventListener('drop',e=>{
-      e.preventDefault();zone.classList.remove('drag');
-      const file=e.dataTransfer.files[0];
-      if(file) processFile(file);
-    });
+    zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0]);});
   }
 }
 
 function showUploadOptions(){
-  openModal(`
-    <div class="modal-title">Subir ticket</div>
+  openModal(`<div class="modal-title">Subir ticket</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <button class="btn-secondary" style="text-align:left;padding:14px 16px" onclick="closeModal();triggerCamera()">📷 Usar cámara</button>
       <button class="btn-secondary" style="text-align:left;padding:14px 16px" onclick="closeModal();triggerFileGallery()">🖼 Galería / PDF</button>
       <button class="btn-secondary" style="text-align:left;padding:14px 16px" onclick="closeModal();openManualTicket()">✏️ Introducir manualmente</button>
-    </div>
-  `);
+    </div>`);
 }
-
-function triggerCamera(){
-  document.getElementById('camera-input').click();
-}
-function triggerFileGallery(){
-  document.getElementById('file-input').click();
-}
-
-document.getElementById('file-input').addEventListener('change',function(){
-  if(this.files[0]) processFile(this.files[0]);
-  this.value='';
-});
-document.getElementById('camera-input').addEventListener('change',function(){
-  if(this.files[0]) processFile(this.files[0]);
-  this.value='';
-});
-
-async function processFile(file){
-  showOCRLoading('Leyendo imagen...');
-
-  try {
-    let base64='', mimeType=file.type;
-    if(file.type==='application/pdf'){
-      mimeType='application/pdf';
-      base64 = await fileToBase64(file);
-    } else {
-      base64 = await fileToBase64(file);
-      mimeType = file.type||'image/jpeg';
-    }
-    setOCRStatus('Enviando a IA...');
-    const result = await analyzeTicketWithGemini(base64, mimeType);
-    hideOCRLoading();
-    openTicketEditor(result, base64, mimeType);
-  } catch(err){
-    hideOCRLoading();
-    showToast('Error al procesar: '+err.message);
-    openTicketEditor(getEmptyTicket(), null, null);
-  }
-}
-
-function fileToBase64(file){
-  return new Promise((res,rej)=>{
-    const r=new FileReader();
-    r.onload=()=>res(r.result.split(',')[1]);
-    r.onerror=()=>rej(new Error('No se pudo leer el archivo'));
-    r.readAsDataURL(file);
-  });
-}
-
-function showOCRLoading(msg){
-  document.getElementById('ocr-loading').style.display='flex';
-  document.getElementById('ocr-status').textContent=msg;
-}
-function setOCRStatus(msg){document.getElementById('ocr-status').textContent=msg;}
-function hideOCRLoading(){document.getElementById('ocr-loading').style.display='none';}
-
-// ── GEMINI API ─────────────────────────────────────────────────
-async function callGemini(prompt, base64, mimeType, systemPrompt, retries=3){
-  const key = DB.apiKey;
-  if(!key) throw new Error('No hay API key configurada. Ve a Configuración.');
-
-  const parts = [];
-  if(base64 && mimeType){
-    parts.push({inline_data:{mime_type:mimeType,data:base64}});
-  }
-  parts.push({text: prompt});
-
-  const body = {
-    contents:[{role:'user',parts}],
-    generationConfig:{temperature:0.2,maxOutputTokens:2048}
-  };
-  if(systemPrompt){
-    body.system_instruction = {parts:[{text:systemPrompt}]};
-  }
-
-  for(let attempt=0; attempt<retries; attempt++){
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
-    );
-    if(res.status===429){
-      const wait = (attempt+1)*15000;
-      setOCRStatus(`Límite de peticiones alcanzado. Reintentando en ${wait/1000}s... (${attempt+1}/${retries})`);
-      await new Promise(r=>setTimeout(r,wait));
-      continue;
-    }
-    if(!res.ok){
-      const err = await res.json().catch(()=>({}));
-      throw new Error(err.error?.message||`Error HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    return text;
-  }
-  throw new Error('Demasiadas peticiones a la API. Espera un minuto e inténtalo de nuevo.');
-}
-
-async function analyzeTicketWithGemini(base64, mimeType){
-  const p1=DB.persons[0], p2=DB.persons[1];
-  const knownProds = Object.entries(DB.knowledge.products).slice(0,10)
-    .map(([k,v])=>`${k}:${v.shared?'común':personName(v.person)}`).join(';');
-  const prompt = `Analiza este ticket de supermercado español. Devuelve SOLO JSON sin markdown:
-{"store":"","date":"YYYY-MM-DD","total":0,"last4":null,"products":[{"rawName":"","name":"","price":0,"discount":0,"qty":1,"confidence":0.9,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|otro"}],"errors":[],"warnings":[]}
-Reglas: normaliza nombres (SAL TO→Salsa tomate), detecta descuentos, date null si no se ve, confidence baja si dudas.
-Productos conocidos: ${knownProds||'ninguno aún'}
-Responde ÚNICAMENTE el JSON.`;
-
-  const text = await callGemini(prompt, base64, mimeType);
-  try {
-    const clean = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    const parsed = JSON.parse(clean);
-    // Apply knowledge to suggest assignments
-    parsed.products = (parsed.products||[]).map(p=>applyKnowledgeToProduct(p));
-    parsed.type = 'ticket';
-    parsed.id = uid();
-    parsed.payer = DB.persons[0].id;
-    parsed.confirmed = false;
-    parsed.createdAt = new Date().toISOString();
-    // Try to detect payer from card
-    if(parsed.last4 && DB.knowledge.cards[parsed.last4]){
-      parsed.payer = DB.knowledge.cards[parsed.last4];
-    }
-    return parsed;
-  } catch(e){
-    return getEmptyTicket();
-  }
-}
-
-function buildKnowledgeHint(){
-  const entries = Object.entries(DB.knowledge.products).slice(0,30);
-  if(entries.length===0) return '';
-  return `\nProductos aprendidos (usa para sugerir asignación):\n${entries.map(([k,v])=>`- "${k}" → ${v.shared?'compartido':personName(v.person)} (${v.pct||50}%)`).join('\n')}`;
-}
-
-function applyKnowledgeToProduct(prod){
-  const key = normalizeKey(prod.name||prod.rawName||'');
-  const known = DB.knowledge.products[key];
-  if(known){
-    prod.assignedTo = known.shared ? null : known.person;
-    prod.shared = known.shared;
-    prod.pct1 = known.pct1||50;
-    prod.knownMatch = true;
-  } else {
-    // Check OCR raw match
-    const ocrKey = (prod.rawName||'').trim().toUpperCase();
-    const ocrMatch = Object.values(DB.knowledge.products).find(v=>v.ocr_raw&&v.ocr_raw.includes(ocrKey));
-    if(ocrMatch){
-      prod.assignedTo = ocrMatch.shared?null:ocrMatch.person;
-      prod.shared = ocrMatch.shared;
-      prod.pct1 = ocrMatch.pct1||50;
-      prod.knownMatch = true;
-    } else {
-      prod.assignedTo = null;
-      prod.shared = true;
-      prod.pct1 = 50;
-    }
-  }
-  prod.finalPrice = prod.price;
-  return prod;
-}
-
-function normalizeKey(name){
-  return name.toLowerCase().replace(/[^a-záéíóúñ0-9]/g,' ').replace(/\s+/g,' ').trim();
-}
-
-function getEmptyTicket(){
-  return {
-    id:uid(), type:'ticket', store:'', date:new Date().toISOString().slice(0,10),
-    total:0, last4:null, payer:DB.persons[0].id,
-    products:[], errors:[], warnings:[], confirmed:false,
-    createdAt:new Date().toISOString()
-  };
-}
+function triggerCamera(){document.getElementById('camera-input').click();}
+function triggerFileGallery(){document.getElementById('file-input').click();}
+document.getElementById('file-input').addEventListener('change',function(){if(this.files[0])processFile(this.files[0]);this.value='';});
+document.getElementById('camera-input').addEventListener('change',function(){if(this.files[0])processFile(this.files[0]);this.value='';});
 
 // ── TICKET EDITOR ──────────────────────────────────────────────
-let currentTicket = null;
-
-function openTicketEditor(ticket, base64, mimeType){
-  currentTicket = JSON.parse(JSON.stringify(ticket));
-  renderTicketEditor();
-  document.getElementById('ticket-editor').style.display='flex';
-}
+let currentTicket=null;
+function openTicketEditor(ticket){currentTicket=JSON.parse(JSON.stringify(ticket));renderTicketEditor();document.getElementById('ticket-editor').style.display='flex';}
 
 function renderTicketEditor(){
-  const t = currentTicket;
-  const p1=DB.persons[0], p2=DB.persons[1];
+  const t=currentTicket;
+  const errorsHtml=[...(t.errors||[]),...(t.warnings||[])].map((e,i)=>`
+    <div class="error-chip">⚠️ ${e}<button onclick="dismissError(${i})">Ignorar</button></div>`).join('');
 
-  const errorsHtml = [...(t.errors||[]),...(t.warnings||[])].map((e,i)=>`
-    <div class="error-chip">
-      ⚠️ ${e}
-      <button onclick="dismissError(${i})">Ignorar</button>
-    </div>
-  `).join('');
+  const payerBtns=DB.persons.map(p=>`
+    <button onclick="setTicketPayer('${p.id}')" style="padding:8px 12px;border-radius:var(--rad-xs);font-size:13px;font-weight:600;
+      background:${t.payer===p.id?p.color+'33':'var(--bg3)'};color:${t.payer===p.id?p.color:'var(--txt1)'};
+      border:1.5px solid ${t.payer===p.id?p.color:'var(--brd)'};">${p.name}</button>`).join('');
 
-  const productsHtml = (t.products||[]).map((prod,i)=>renderProductRow(prod,i)).join('');
-
-  const payerOptions = DB.persons.map(p=>`
-    <button onclick="setTicketPayer('${p.id}')" style="
-      padding:10px 16px;border-radius:var(--rad-sm);font-size:14px;font-weight:600;
-      background:${t.payer===p.id?p.color+'33':'var(--bg3)'};
-      color:${t.payer===p.id?p.color:'var(--txt1)'};
-      border:1.5px solid ${t.payer===p.id?p.color:'var(--brd)'};
-      flex:1;transition:.15s;
-    ">${p.name}</button>
-  `).join('');
-
-  document.getElementById('ticket-editor').innerHTML = `
+  document.getElementById('ticket-editor').innerHTML=`
     <div class="te-header">
-      <button onclick="closeTicketEditor()" style="color:var(--txt1)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <button onclick="closeTicketEditor()" style="color:var(--txt1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       <h2>Revisar ticket</h2>
       <button onclick="deleteCurrentTicket()" style="color:var(--red);font-size:13px">Eliminar</button>
     </div>
     <div class="te-body">
       ${errorsHtml?`<div class="te-section">${errorsHtml}</div>`:''}
-
       <div class="te-section">
-        <div class="te-section-title">Información del ticket</div>
-        <div class="card" style="margin:0;margin-bottom:12px">
-          <div class="field-row">
-            <label class="field-label">Supermercado</label>
-            <input id="te-store" value="${t.store||''}" placeholder="Ej: Mercadona" oninput="currentTicket.store=this.value"/>
-          </div>
-          <div class="field-row" style="margin-top:10px">
-            <label class="field-label">Fecha</label>
-            <input type="date" id="te-date" value="${t.date||''}" onchange="currentTicket.date=this.value"/>
-          </div>
-          <div class="field-row" style="margin-top:10px">
-            <label class="field-label">Total del ticket</label>
-            <input type="number" id="te-total" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/>
-          </div>
-          <div class="field-row" style="margin-top:10px">
-            <label class="field-label">Últimos 4 dígitos de la tarjeta</label>
-            <input id="te-last4" value="${t.last4||''}" placeholder="ej: 4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:600"/>
-          </div>
+        <div class="te-section-title">Información</div>
+        <div class="card" style="margin:0 0 12px">
+          <div class="field-row"><label class="field-label">Supermercado</label><input id="te-store" value="${t.store||''}" placeholder="Ej: Mercadona" oninput="currentTicket.store=this.value"/></div>
+          <div class="field-row" style="margin-top:10px"><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" onchange="currentTicket.date=this.value"/></div>
+          <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
+          <div class="field-row" style="margin-top:10px"><label class="field-label">Últimos 4 dígitos tarjeta</label><input value="${t.last4||''}" placeholder="4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:600"/></div>
         </div>
       </div>
-
       <div class="te-section">
         <div class="te-section-title">¿Quién pagó?</div>
-        <div style="display:flex;gap:10px;margin-bottom:4px">${payerOptions}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">${payerBtns}</div>
       </div>
-
       <div class="te-section">
         <div class="te-section-title">Productos (${(t.products||[]).length})</div>
-        <div id="products-list">${productsHtml}</div>
+        <div id="products-list">${(t.products||[]).map((p,i)=>renderProductRow(p,i)).join('')}</div>
         <button class="btn-ghost" style="margin-top:6px;width:100%;text-align:center" onclick="addEmptyProduct()">+ Añadir producto</button>
       </div>
-
       <div style="height:20px"></div>
     </div>
     <div class="te-footer">
       <button class="btn-secondary" style="flex:1" onclick="closeTicketEditor()">Cancelar</button>
-      <button class="btn-primary" style="flex:2" onclick="saveTicket()">Guardar ticket</button>
-    </div>
-  `;
+      <button class="btn-primary" style="flex:2" onclick="saveTicket()">Guardar</button>
+    </div>`;
 }
 
-function renderProductRow(prod, i){
-  const p1=DB.persons[0], p2=DB.persons[1];
-  const confClass = prod.confidence>=0.85?'conf-high':prod.confidence>=0.6?'conf-mid':'conf-low';
-  const confPct = Math.round((prod.confidence||1)*100);
+function renderProductRow(prod,i){
+  const confClass=prod.confidence>=0.85?'conf-high':prod.confidence>=0.6?'conf-mid':'conf-low';
+  const assignedTo=prod.assignedTo;
+  const isShared=!assignedTo;
 
-  const assignedTo = prod.assignedTo;
-  const isShared = !assignedTo;
+  const personBtns=DB.persons.map(p=>{
+    const active=assignedTo===p.id;
+    return`<button class="assign-btn" style="background:${active?p.color+'33':'transparent'};color:${active?p.color:'var(--txt2)'};border-color:${active?p.color:'var(--brd)'};" onclick="assignProduct(${i},'${p.id}')">${p.name}</button>`;
+  }).join('');
 
-  const p1Style = assignedTo===p1.id?`background:${p1.color}33;color:${p1.color};border-color:${p1.color}`:`color:var(--txt2);border:1px solid var(--brd)`;
-  const p2Style = assignedTo===p2.id?`background:${p2.color}33;color:${p2.color};border-color:${p2.color}`:`color:var(--txt2);border:1px solid var(--brd)`;
-  const sharedStyle = isShared?`background:rgba(74,158,255,.15);color:#4a9eff;border-color:#4a9eff`:`color:var(--txt2);border:1px solid var(--brd)`;
-
-  return `
-    <div class="product-row" id="prod-${i}">
-      <div class="product-top">
-        <div class="confidence-dot ${confClass}" title="${confPct}% confianza"></div>
-        <div class="product-name-wrap">
-          <input value="${prod.name||''}" style="background:transparent;border:none;padding:0;font-size:14px;font-weight:500;color:var(--txt0);width:100%"
-            oninput="currentTicket.products[${i}].name=this.value" placeholder="Nombre del producto"/>
-          ${prod.rawName&&prod.rawName!==prod.name?`<div class="product-name-raw">${prod.rawName}</div>`:''}
-        </div>
-        <input type="number" value="${(prod.finalPrice||prod.price||0).toFixed(2)}" step="0.01"
-          style="width:70px;text-align:right;font-size:14px;font-weight:700;background:transparent;border:none;padding:0;color:var(--txt0)"
-          oninput="currentTicket.products[${i}].finalPrice=parseFloat(this.value)||0"/>
+  return`<div class="product-row" id="prod-${i}">
+    <div class="product-top">
+      <div class="confidence-dot ${confClass}"></div>
+      <div class="product-name-wrap">
+        <input value="${prod.name||''}" style="background:transparent;border:none;padding:0;font-size:14px;font-weight:500;color:var(--txt0);width:100%" oninput="currentTicket.products[${i}].name=this.value" placeholder="Nombre del producto"/>
+        ${prod.rawName&&prod.rawName!==prod.name?`<div class="product-name-raw">${prod.rawName}</div>`:''}
       </div>
-      <div class="product-bottom">
-        <button class="assign-btn" style="${p1Style}" onclick="assignProduct(${i},'${p1.id}')">${p1.name}</button>
-        <button class="assign-btn" style="${p2Style}" onclick="assignProduct(${i},'${p2.id}')">${p2.name}</button>
-        <button class="assign-btn" style="${sharedStyle}" onclick="assignProduct(${i},null)">Compartido</button>
-        ${isShared?`<button class="share-btn active" onclick="editSplit(${i})">
-          ${prod.pct1||50}% / ${100-(prod.pct1||50)}%
-        </button>`:''}
-        <button onclick="removeProduct(${i})" style="margin-left:auto;color:var(--txt3);font-size:18px">×</button>
-      </div>
+      <input type="number" value="${(prod.finalPrice||prod.price||0).toFixed(2)}" step="0.01"
+        style="width:68px;text-align:right;font-size:14px;font-weight:700;background:transparent;border:none;padding:0;color:var(--txt0)"
+        oninput="currentTicket.products[${i}].finalPrice=parseFloat(this.value)||0"/>
     </div>
-  `;
+    <div class="product-bottom">
+      ${personBtns}
+      <button class="assign-btn" style="background:${isShared?'rgba(74,158,255,.15)':'transparent'};color:${isShared?'#4a9eff':'var(--txt2)'};border-color:${isShared?'#4a9eff':'var(--brd)'};" onclick="assignProduct(${i},null)">Común</button>
+      ${isShared?`<button class="share-btn active" onclick="editSplit(${i})">${prod.pct1||50}/${100-(prod.pct1||50)}</button>`:''}
+      <button onclick="removeProduct(${i})" style="margin-left:auto;color:var(--txt3);font-size:20px;line-height:1">×</button>
+    </div>
+  </div>`;
 }
 
-function assignProduct(i, personId){
-  currentTicket.products[i].assignedTo = personId;
-  currentTicket.products[i].shared = !personId;
-  renderProductsList();
-}
-
-function renderProductsList(){
-  const el = document.getElementById('products-list');
-  if(el) el.innerHTML = (currentTicket.products||[]).map((p,i)=>renderProductRow(p,i)).join('');
-}
+function assignProduct(i,personId){currentTicket.products[i].assignedTo=personId;currentTicket.products[i].shared=!personId;renderProductsList();}
+function renderProductsList(){const el=document.getElementById('products-list');if(el)el.innerHTML=(currentTicket.products||[]).map((p,i)=>renderProductRow(p,i)).join('');}
 
 function editSplit(i){
-  const prod = currentTicket.products[i];
-  const p1=DB.persons[0],p2=DB.persons[1];
-  openModal(`
-    <div class="modal-title">Reparto del gasto</div>
-    <p style="font-size:13px;color:var(--txt2);margin-bottom:16px">${prod.name}</p>
+  const prod=currentTicket.products[i];
+  const p1=DB.persons[0],p2=DB.persons[1]||DB.persons[0];
+  openModal(`<div class="modal-title">Reparto de "${prod.name}"</div>
     <div class="split-row" style="margin-bottom:16px">
-      <div class="split-person">
-        <div style="font-size:13px;color:var(--txt2)">${p1.name}</div>
-        <div class="split-pct" id="sp1" style="color:${p1.color}">${prod.pct1||50}%</div>
-      </div>
-      <input type="range" class="split-slider" min="0" max="100" value="${prod.pct1||50}"
-        oninput="updateSplitPreview(this.value)" id="split-range"/>
-      <div class="split-person">
-        <div style="font-size:13px;color:var(--txt2)">${p2.name}</div>
-        <div class="split-pct" id="sp2" style="color:${p2.color}">${100-(prod.pct1||50)}%</div>
-      </div>
+      <div class="split-person"><div style="font-size:12px;color:var(--txt2)">${p1.name}</div><div class="split-pct" id="sp1" style="color:${p1.color}">${prod.pct1||50}%</div></div>
+      <input type="range" class="split-slider" min="0" max="100" value="${prod.pct1||50}" oninput="updateSplitPreview(this.value)" id="split-range"/>
+      <div class="split-person"><div style="font-size:12px;color:var(--txt2)">${p2.name}</div><div class="split-pct" id="sp2" style="color:${p2.color}">${100-(prod.pct1||50)}%</div></div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn-secondary" style="flex:1" onclick="setQuickSplit(50)">50 / 50</button>
-      <button class="btn-secondary" style="flex:1" onclick="setQuickSplit(70)">70 / 30</button>
-      <button class="btn-secondary" style="flex:1" onclick="setQuickSplit(100)">100 / 0</button>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn-secondary" style="flex:1;font-size:13px" onclick="setQuickSplit(50)">50/50</button>
+      <button class="btn-secondary" style="flex:1;font-size:13px" onclick="setQuickSplit(70)">70/30</button>
+      <button class="btn-secondary" style="flex:1;font-size:13px" onclick="setQuickSplit(100)">Todo p1</button>
     </div>
-    <button class="btn-primary" onclick="saveSplit(${i})">Aplicar</button>
-  `);
+    <button class="btn-primary" onclick="saveSplit(${i})">Aplicar</button>`);
 }
-
-function updateSplitPreview(val){
-  const v=parseInt(val);
-  document.getElementById('sp1').textContent=v+'%';
-  document.getElementById('sp2').textContent=(100-v)+'%';
-}
-function setQuickSplit(v){
-  document.getElementById('split-range').value=v;
-  updateSplitPreview(v);
-}
-function saveSplit(i){
-  const v = parseInt(document.getElementById('split-range').value);
-  currentTicket.products[i].pct1 = v;
-  closeModal();
-  renderProductsList();
-}
-
-function removeProduct(i){
-  currentTicket.products.splice(i,1);
-  renderProductsList();
-}
-
-function addEmptyProduct(){
-  currentTicket.products.push({
-    rawName:'',name:'',price:0,finalPrice:0,qty:1,
-    confidence:1,category:'otro',
-    assignedTo:null,shared:true,pct1:50
-  });
-  renderProductsList();
-  setTimeout(()=>{
-    const last = document.querySelectorAll('.product-row');
-    if(last.length) last[last.length-1].scrollIntoView({behavior:'smooth'});
-  },100);
-}
-
-function setTicketPayer(personId){
-  currentTicket.payer = personId;
-  // Check if we should learn this card
-  if(currentTicket.last4){
-    DB.knowledge.cards[currentTicket.last4] = personId;
-  }
-  renderTicketEditor();
-}
-
-function dismissError(i){
-  const allErrors = [...(currentTicket.errors||[]),...(currentTicket.warnings||[])];
-  allErrors.splice(i,1);
-  currentTicket.errors = allErrors.slice(0, currentTicket.errors.length-1>=0?currentTicket.errors.length-1:0);
-  currentTicket.warnings = [];
-  renderTicketEditor();
-}
+function updateSplitPreview(v){const n=parseInt(v);document.getElementById('sp1').textContent=n+'%';document.getElementById('sp2').textContent=(100-n)+'%';}
+function setQuickSplit(v){document.getElementById('split-range').value=v;updateSplitPreview(v);}
+function saveSplit(i){currentTicket.products[i].pct1=parseInt(document.getElementById('split-range').value);closeModal();renderProductsList();}
+function removeProduct(i){currentTicket.products.splice(i,1);renderProductsList();}
+function addEmptyProduct(){currentTicket.products.push({rawName:'',name:'',price:0,finalPrice:0,qty:1,confidence:1,category:'otro',assignedTo:null,shared:true,pct1:50});renderProductsList();setTimeout(()=>{const l=document.querySelectorAll('.product-row');if(l.length)l[l.length-1].scrollIntoView({behavior:'smooth'});},100);}
+function setTicketPayer(id){currentTicket.payer=id;if(currentTicket.last4)DB.knowledge.cards[currentTicket.last4]=id;renderTicketEditor();}
+function dismissError(i){currentTicket.errors=[];currentTicket.warnings=[];renderTicketEditor();}
 
 function saveTicket(){
-  const t = currentTicket;
-  t.confirmed = true;
-  // Recalculate total from products if needed
-  if(!t.total||t.total===0){
-    t.total = (t.products||[]).reduce((sum,p)=>sum+(parseFloat(p.finalPrice||p.price||0)),0);
-  }
-  // Learn from this ticket
+  const t=currentTicket;t.confirmed=true;
+  if(!t.total||t.total===0) t.total=(t.products||[]).reduce((s,p)=>s+parseFloat(p.finalPrice||p.price||0),0);
   learnFromTicket(t);
-  // Save
-  const idx = DB.tickets.findIndex(x=>x.id===t.id);
-  if(idx>=0) DB.tickets[idx]=t;
-  else DB.tickets.push(t);
-  saveDB();
-  // Maybe generate AI questions
-  generateAIQuestions(t);
-  closeTicketEditor();
-  showToast('Ticket guardado ✓');
-  showScreen(currentScreen==='tickets'?'tickets':'home');
+  const idx=DB.tickets.findIndex(x=>x.id===t.id);
+  if(idx>=0)DB.tickets[idx]=t;else DB.tickets.push(t);
+  saveDB();generateAIQuestions(t);
+  closeTicketEditor();showToast('Ticket guardado ✓');showScreen(currentScreen==='tickets'?'tickets':'home');
 }
 
 function learnFromTicket(t){
-  // Learn card → person
-  if(t.last4&&t.payer){
-    DB.knowledge.cards[t.last4] = t.payer;
-  }
-  // Learn products
+  if(t.last4&&t.payer) DB.knowledge.cards[t.last4]=t.payer;
   (t.products||[]).forEach(prod=>{
-    const key = normalizeKey(prod.name||'');
-    if(!key) return;
-    const ocrRaw = prod.rawName?(prod.rawName.trim().toUpperCase()):'';
-    const existing = DB.knowledge.products[key]||{count:0,ocr_raw:[]};
-    DB.knowledge.products[key] = {
-      person: prod.assignedTo||null,
-      shared: !prod.assignedTo,
-      pct1: prod.pct1||50,
-      count: (existing.count||0)+1,
-      category: prod.category,
-      ocr_raw: ocrRaw&&!existing.ocr_raw.includes(ocrRaw)?[...existing.ocr_raw,ocrRaw]:existing.ocr_raw
-    };
+    const key=normalizeKey(prod.name||'');if(!key)return;
+    const ocrRaw=(prod.rawName||'').trim().toUpperCase();
+    const ex=DB.knowledge.products[key]||{count:0,ocr_raw:[]};
+    DB.knowledge.products[key]={person:prod.assignedTo||null,shared:!prod.assignedTo,pct1:prod.pct1||50,count:(ex.count||0)+1,category:prod.category,ocr_raw:ocrRaw&&!ex.ocr_raw.includes(ocrRaw)?[...ex.ocr_raw,ocrRaw]:ex.ocr_raw};
   });
 }
 
-function closeTicketEditor(){
-  document.getElementById('ticket-editor').style.display='none';
-  currentTicket = null;
-}
-
-function deleteCurrentTicket(){
-  if(!currentTicket) return;
-  DB.tickets = DB.tickets.filter(t=>t.id!==currentTicket.id);
-  saveDB();
-  closeTicketEditor();
-  showToast('Ticket eliminado');
-  showScreen(currentScreen);
-}
-
+function closeTicketEditor(){document.getElementById('ticket-editor').style.display='none';currentTicket=null;}
+function deleteCurrentTicket(){if(!currentTicket)return;DB.tickets=DB.tickets.filter(t=>t.id!==currentTicket.id);saveDB();closeTicketEditor();showToast('Ticket eliminado');showScreen(currentScreen);}
+function openManualTicket(){openTicketEditor(getEmptyTicket());}
 function editItem(id){
-  const ticket = DB.tickets.find(t=>t.id===id);
-  if(ticket){openTicketEditor(ticket,null,null);return;}
-  const expense = DB.expenses.find(e=>e.id===id);
-  if(expense){openExpenseEditor(expense);return;}
-}
-
-// ── MANUAL TICKET ──────────────────────────────────────────────
-function openManualTicket(){
-  const t = getEmptyTicket();
-  t.products = [];
-  openTicketEditor(t, null, null);
+  const t=DB.tickets.find(x=>x.id===id);if(t){openTicketEditor(t);return;}
+  const e=DB.expenses.find(x=>x.id===id);if(e){openExpenseEditor(e);}
 }
 
 // ── MANUAL EXPENSE ─────────────────────────────────────────────
-let currentExpense = null;
-
-function openManualExpense(){
-  currentExpense = {
-    id:uid(),type:'expense',
-    store:'',category:'hogar',description:'',
-    total:0,payer:DB.persons[0].id,
-    date:new Date().toISOString().slice(0,10),
-    split1:50,confirmed:false,
-    createdAt:new Date().toISOString()
-  };
-  renderManualExpenseSheet();
-  document.getElementById('me-sheet').style.display='flex';
-}
-
-function openExpenseEditor(exp){
-  currentExpense = JSON.parse(JSON.stringify(exp));
-  renderManualExpenseSheet();
-  document.getElementById('me-sheet').style.display='flex';
-}
-
-const EXPENSE_CATS = [
-  {id:'alquiler',label:'Alquiler',emoji:'🏠'},
-  {id:'suministros',label:'Suministros',emoji:'💡'},
-  {id:'internet',label:'Internet',emoji:'📶'},
-  {id:'suscripciones',label:'Suscripciones',emoji:'📱'},
-  {id:'restaurantes',label:'Restaurantes',emoji:'🍽'},
-  {id:'transporte',label:'Transporte',emoji:'🚗'},
-  {id:'ocio',label:'Ocio',emoji:'🎉'},
-  {id:'salud',label:'Salud',emoji:'💊'},
-  {id:'ropa',label:'Ropa',emoji:'👗'},
-  {id:'hogar',label:'Hogar',emoji:'🛋'},
-  {id:'mascotas',label:'Mascotas',emoji:'🐾'},
-  {id:'otro',label:'Otro',emoji:'📌'},
+let currentExpense=null;
+const EXPENSE_CATS=[
+  {id:'alquiler',label:'Alquiler',emoji:'🏠'},{id:'suministros',label:'Luz/Agua/Gas',emoji:'💡'},
+  {id:'internet',label:'Internet',emoji:'📶'},{id:'suscripciones',label:'Suscripciones',emoji:'📱'},
+  {id:'restaurantes',label:'Restaurantes',emoji:'🍽'},{id:'transporte',label:'Transporte',emoji:'🚗'},
+  {id:'ocio',label:'Ocio',emoji:'🎉'},{id:'salud',label:'Salud',emoji:'💊'},
+  {id:'ropa',label:'Ropa',emoji:'👗'},{id:'hogar',label:'Hogar',emoji:'🛋'},
+  {id:'mascotas',label:'Mascotas',emoji:'🐾'},{id:'otro',label:'Otro',emoji:'📌'},
 ];
+function openManualExpense(){currentExpense={id:uid(),type:'expense',store:'',category:'hogar',description:'',total:0,payer:DB.persons[0].id,date:new Date().toISOString().slice(0,10),split1:50,confirmed:false,createdAt:new Date().toISOString()};renderManualExpenseSheet();document.getElementById('me-sheet').style.display='flex';}
+function openExpenseEditor(exp){currentExpense=JSON.parse(JSON.stringify(exp));renderManualExpenseSheet();document.getElementById('me-sheet').style.display='flex';}
 
 function renderManualExpenseSheet(){
-  const e = currentExpense;
-  const p1=DB.persons[0], p2=DB.persons[1];
+  const e=currentExpense;
+  const catBtns=EXPENSE_CATS.map(c=>`<button onclick="setExpenseCat('${c.id}')" style="padding:7px 11px;border-radius:var(--rad-xs);font-size:12px;background:${e.category===c.id?'var(--accent)33':'var(--bg3)'};color:${e.category===c.id?'var(--accent)':'var(--txt1)'};border:1px solid ${e.category===c.id?'var(--accent)':'var(--brd)'};">${c.emoji} ${c.label}</button>`).join('');
+  const payerBtns=DB.persons.map(p=>`<button onclick="setExpensePayer('${p.id}')" style="flex:1;padding:10px;border-radius:var(--rad-xs);font-size:13px;font-weight:600;background:${e.payer===p.id?p.color+'33':'var(--bg3)'};color:${e.payer===p.id?p.color:'var(--txt1)'};border:1.5px solid ${e.payer===p.id?p.color:'var(--brd)'};">${p.name}</button>`).join('');
+  const p1=DB.persons[0],p2=DB.persons[1]||DB.persons[0];
 
-  const catButtons = EXPENSE_CATS.map(c=>`
-    <button onclick="setExpenseCat('${c.id}')" style="
-      padding:8px 12px;border-radius:var(--rad-xs);font-size:13px;
-      background:${e.category===c.id?'var(--accent)33':'var(--bg3)'};
-      color:${e.category===c.id?'var(--accent)':'var(--txt1)'};
-      border:1px solid ${e.category===c.id?'var(--accent)':'var(--brd)'};
-    ">${c.emoji} ${c.label}</button>
-  `).join('');
-
-  const payerBtns = DB.persons.map(p=>`
-    <button onclick="setExpensePayer('${p.id}')" style="
-      flex:1;padding:11px;border-radius:var(--rad-sm);font-size:14px;font-weight:600;
-      background:${e.payer===p.id?p.color+'33':'var(--bg3)'};
-      color:${e.payer===p.id?p.color:'var(--txt1)'};
-      border:1.5px solid ${e.payer===p.id?p.color:'var(--brd)'};
-    ">${p.name}</button>
-  `).join('');
-
-  document.getElementById('me-sheet').innerHTML = `
+  document.getElementById('me-sheet').innerHTML=`
     <div class="me-header">
-      <button onclick="closeManualExpense()" style="color:var(--txt1)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <button onclick="closeManualExpense()" style="color:var(--txt1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       <h2>Gasto manual</h2>
       ${currentExpense.confirmed?`<button onclick="deleteExpense()" style="color:var(--red);font-size:13px">Eliminar</button>`:'<div style="width:60px"></div>'}
     </div>
     <div class="me-body">
-      <div class="field-row">
-        <label class="field-label">Importe</label>
-        <input type="number" id="me-total" value="${e.total||''}" placeholder="0,00" step="0.01" style="font-size:28px;font-weight:800;text-align:center;letter-spacing:-1px"
-          oninput="currentExpense.total=parseFloat(this.value)||0"/>
-      </div>
-      <div class="field-row">
-        <label class="field-label">Descripción</label>
-        <input id="me-desc" value="${e.description||''}" placeholder="Ej: Alquiler julio" oninput="currentExpense.description=this.value"/>
-      </div>
-      <div class="field-row">
-        <label class="field-label">Categoría</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${catButtons}</div>
-      </div>
-      <div class="field-row">
-        <label class="field-label">Fecha</label>
-        <input type="date" value="${e.date||''}" onchange="currentExpense.date=this.value"/>
-      </div>
-      <div class="field-row">
-        <label class="field-label">¿Quién pagó?</label>
-        <div style="display:flex;gap:10px">${payerBtns}</div>
-      </div>
+      <div class="field-row"><label class="field-label">Importe</label><input type="number" value="${e.total||''}" placeholder="0,00" step="0.01" style="font-size:28px;font-weight:800;text-align:center;letter-spacing:-1px" oninput="currentExpense.total=parseFloat(this.value)||0"/></div>
+      <div class="field-row"><label class="field-label">Descripción</label><input value="${e.description||''}" placeholder="Ej: Alquiler julio" oninput="currentExpense.description=this.value"/></div>
+      <div class="field-row"><label class="field-label">Categoría</label><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${catBtns}</div></div>
+      <div class="field-row"><label class="field-label">Fecha</label><input type="date" value="${e.date||''}" onchange="currentExpense.date=this.value"/></div>
+      <div class="field-row"><label class="field-label">¿Quién pagó?</label><div style="display:flex;gap:8px;flex-wrap:wrap">${payerBtns}</div></div>
       <div class="field-row">
         <label class="field-label">Reparto</label>
         <div class="split-row" style="margin-top:8px">
-          <div class="split-person">
-            <div style="font-size:12px;color:var(--txt2)">${p1.name}</div>
-            <div class="split-pct" id="me-sp1" style="color:${p1.color}">${e.split1||50}%</div>
-          </div>
-          <input type="range" class="split-slider" min="0" max="100" value="${e.split1||50}" id="me-split-range"
-            oninput="updateMeSplit(this.value)"/>
-          <div class="split-person">
-            <div style="font-size:12px;color:var(--txt2)">${p2.name}</div>
-            <div class="split-pct" id="me-sp2" style="color:${p2.color}">${100-(e.split1||50)}%</div>
-          </div>
+          <div class="split-person"><div style="font-size:12px;color:var(--txt2)">${p1.name}</div><div class="split-pct" id="me-sp1" style="color:${p1.color}">${e.split1||50}%</div></div>
+          <input type="range" class="split-slider" min="0" max="100" value="${e.split1||50}" id="me-split-range" oninput="updateMeSplit(this.value)"/>
+          <div class="split-person"><div style="font-size:12px;color:var(--txt2)">${p2.name}</div><div class="split-pct" id="me-sp2" style="color:${p2.color}">${100-(e.split1||50)}%</div></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(50)">50/50</button>
-          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(100)">100/0</button>
-          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(0)">0/100</button>
+          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(100)">Todo p1</button>
+          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(0)">Todo p2</button>
         </div>
       </div>
     </div>
-    <div class="me-footer">
-      <button class="btn-primary" onclick="saveManualExpense()">Guardar gasto</button>
-    </div>
-  `;
+    <div class="me-footer"><button class="btn-primary" onclick="saveManualExpense()">Guardar gasto</button></div>`;
 }
-
 function setExpenseCat(c){currentExpense.category=c;renderManualExpenseSheet();}
 function setExpensePayer(id){currentExpense.payer=id;renderManualExpenseSheet();}
-function updateMeSplit(v){
-  currentExpense.split1=parseInt(v);
-  document.getElementById('me-sp1').textContent=v+'%';
-  document.getElementById('me-sp2').textContent=(100-parseInt(v))+'%';
-}
-function setMeQuickSplit(v){
-  currentExpense.split1=v;
-  document.getElementById('me-split-range').value=v;
-  updateMeSplit(v);
-}
+function updateMeSplit(v){currentExpense.split1=parseInt(v);document.getElementById('me-sp1').textContent=v+'%';document.getElementById('me-sp2').textContent=(100-parseInt(v))+'%';}
+function setMeQuickSplit(v){currentExpense.split1=v;document.getElementById('me-split-range').value=v;updateMeSplit(v);}
 function saveManualExpense(){
   if(!currentExpense.total||currentExpense.total<=0){showToast('Introduce un importe');return;}
-  currentExpense.confirmed = true;
-  currentExpense.store = currentExpense.description || (EXPENSE_CATS.find(c=>c.id===currentExpense.category)||{}).label || 'Gasto';
-  const idx = DB.expenses.findIndex(e=>e.id===currentExpense.id);
-  if(idx>=0) DB.expenses[idx]=currentExpense;
-  else DB.expenses.push(currentExpense);
-  saveDB();
-  closeManualExpense();
-  showToast('Gasto guardado ✓');
-  showScreen(currentScreen);
+  currentExpense.confirmed=true;currentExpense.store=currentExpense.description||(EXPENSE_CATS.find(c=>c.id===currentExpense.category)||{}).label||'Gasto';
+  const idx=DB.expenses.findIndex(e=>e.id===currentExpense.id);
+  if(idx>=0)DB.expenses[idx]=currentExpense;else DB.expenses.push(currentExpense);
+  saveDB();closeManualExpense();showToast('Gasto guardado ✓');showScreen(currentScreen);
 }
-function deleteExpense(){
-  DB.expenses = DB.expenses.filter(e=>e.id!==currentExpense.id);
-  saveDB();
-  closeManualExpense();
-  showToast('Gasto eliminado');
-  showScreen(currentScreen);
-}
-function closeManualExpense(){
-  document.getElementById('me-sheet').style.display='none';
-  currentExpense=null;
-}
+function deleteExpense(){DB.expenses=DB.expenses.filter(e=>e.id!==currentExpense.id);saveDB();closeManualExpense();showToast('Gasto eliminado');showScreen(currentScreen);}
+function closeManualExpense(){document.getElementById('me-sheet').style.display='none';currentExpense=null;}
 
 // ── BALANCE SCREEN ─────────────────────────────────────────────
 function renderBalance(){
-  const {p1balance,p2balance,owes,amount} = calcBalance();
-  const p1=DB.persons[0],p2=DB.persons[1];
-  const settlements = DB.settlements.slice().reverse();
+  const {paid,owes,amount}=calcBalance();
+  const settlements=DB.settlements.slice().reverse();
+  const creditor=owes?DB.persons.find(p=>p.id!==owes):null;
 
-  const creditor = owes?(owes===p1.id?p2:p1):null;
-
-  document.getElementById('view').innerHTML = `
-    <div class="screen-header">
-      <h1>Balance</h1>
-      <p>Deudas y liquidaciones</p>
+  document.getElementById('view').innerHTML=`
+    <div class="screen-header"><h1>Balance</h1><p>Deudas y liquidaciones</p></div>
+    ${amount<0.01?`<div class="balance-card"><div class="bc-owes" style="color:var(--green)">✓ Cuentas al día</div><div class="bc-amount" style="font-size:28px">Sin deuda</div></div>`
+    :`<div class="balance-card"><div class="bc-owes">${personName(owes)} debe a ${creditor?.name}</div><div class="bc-amount">${fmt(amount)}</div></div>
+      <button class="settle-btn" onclick="settleAccounts()">Cuentas saldadas ✓</button>`}
+    <div style="margin:0 16px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
+      ${DB.persons.map(p=>`<div class="stat-card"><div class="stat-label" style="color:${p.color}">${p.name}</div><div class="stat-value" style="color:${p.color}">${fmt(paid[p.id]||0)}</div></div>`).join('')}
     </div>
-
-    ${amount===0?`
-      <div class="balance-card">
-        <div class="bc-owes" style="color:var(--green)">✓ Cuentas al día</div>
-        <div class="bc-amount" style="font-size:28px">Sin deuda pendiente</div>
-        <div class="bc-detail">Nadie debe nada a nadie ahora mismo.</div>
-      </div>
-    `:`
-      <div class="balance-card">
-        <div class="bc-owes">${personName(owes)} debe a ${creditor.name}</div>
-        <div class="bc-amount">${fmt(amount)}</div>
-        <div class="bc-detail">
-          ${p1.name} pagó ${fmt(p1balance)} · ${p2.name} pagó ${fmt(p2balance)}
-        </div>
-      </div>
-      <button class="settle-btn" onclick="settleAccounts()">
-        Cuentas saldadas ✓
-      </button>
-    `}
-
-    <div style="margin:0 16px 14px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="stat-card">
-          <div class="stat-label">${p1.name} pagó</div>
-          <div class="stat-value" style="color:${p1.color}">${fmt(p1balance)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">${p2.name} pagó</div>
-          <div class="stat-value" style="color:${p2.color}">${fmt(p2balance)}</div>
-        </div>
-      </div>
-    </div>
-
     <div class="recent-label">Historial de liquidaciones</div>
-    ${settlements.length===0?`
-      <div class="empty-state" style="padding:30px">
-        <p>Sin liquidaciones todavía</p>
-      </div>
-    `:settlements.map(s=>`
-      <div class="history-settle">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-        <div class="settle-date">${fmtDate(s.date)}</div>
-        <div class="settle-info" style="color:var(--txt1)">${s.msg}</div>
-      </div>
-    `).join('')}
-  `;
+    ${settlements.length===0?`<div class="empty-state" style="padding:30px"><p>Sin liquidaciones todavía</p></div>`
+      :settlements.map(s=>`<div class="history-settle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><div class="settle-date">${fmtDate(s.date)}</div><div class="settle-info">${s.msg}</div></div>`).join('')}`;
 }
 
 function settleAccounts(){
-  const {owes,amount} = calcBalance();
+  const {owes,amount}=calcBalance();
   if(amount<0.01){showToast('No hay deuda que saldar');return;}
-  openModal(`
-    <div class="modal-title">¿Saldar cuentas?</div>
-    <p style="font-size:14px;color:var(--txt1);margin-bottom:20px">
-      Se registrará que las cuentas han sido saldadas a día de hoy. El historial se conservará.
-    </p>
-    <div style="display:flex;gap:10px">
-      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" style="flex:2" onclick="confirmSettle()">Confirmar</button>
-    </div>
-  `);
+  openModal(`<div class="modal-title">¿Saldar cuentas?</div>
+    <p style="font-size:14px;color:var(--txt1);margin-bottom:20px">Se registrará la liquidación con fecha de hoy.</p>
+    <div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-primary" style="flex:2" onclick="confirmSettle()">Confirmar</button></div>`);
 }
-
 function confirmSettle(){
-  const {owes,amount,p1balance,p2balance} = calcBalance();
-  const settlement = {
-    id:uid(),
-    date:new Date().toISOString(),
-    msg:`${personName(owes)} pagó ${fmt(amount)} a ${personName(owes===DB.persons[0].id?DB.persons[1].id:DB.persons[0].id)}`,
-    amount,owes,p1balance,p2balance,
-    ticketIds:DB.tickets.map(t=>t.id),
-    expenseIds:DB.expenses.map(e=>e.id)
-  };
-  DB.settlements.push(settlement);
-  // Mark all confirmed items as settled
+  const {owes,amount,paid}=calcBalance();
+  const creditor=DB.persons.find(p=>p.id!==owes);
+  DB.settlements.push({id:uid(),date:new Date().toISOString(),msg:`${personName(owes)} pagó ${fmt(amount)} a ${creditor?.name}`,amount,owes});
   DB.tickets.forEach(t=>{if(t.confirmed)t.settled=true;});
   DB.expenses.forEach(e=>{if(e.confirmed)e.settled=true;});
-  saveDB();
-  closeModal();
-  showToast(`Cuentas saldadas el ${fmtDate(settlement.date)} ✓`,3000);
-  renderBalance();
+  saveDB();closeModal();showToast('Cuentas saldadas ✓',3000);renderBalance();
 }
 
-// ── STATS SCREEN ───────────────────────────────────────────────
+// ── STATS ──────────────────────────────────────────────────────
 function renderStats(){
-  const p1=DB.persons[0],p2=DB.persons[1];
   const now=new Date();
-  const thisMonth = DB.tickets.filter(t=>t.confirmed&&t.date&&new Date(t.date).getMonth()===now.getMonth()&&new Date(t.date).getFullYear()===now.getFullYear());
-  const allConfirmed = DB.tickets.filter(t=>t.confirmed);
+  const allT=DB.tickets.filter(t=>t.confirmed);
+  const monthT=allT.filter(t=>t.date&&new Date(t.date).getMonth()===now.getMonth()&&new Date(t.date).getFullYear()===now.getFullYear());
+  const monthTotal=monthT.reduce((s,t)=>s+(parseFloat(t.total)||0),0);
 
-  // Total spent this month
-  const monthTotal = thisMonth.reduce((s,t)=>s+(parseFloat(t.total)||0),0);
-  // Per person this month
-  let p1month=0,p2month=0;
-  thisMonth.forEach(t=>{
-    (t.products||[]).forEach(prod=>{
-      const price=parseFloat(prod.finalPrice||prod.price||0);
-      if(prod.assignedTo===p1.id) p1month+=price;
-      else if(prod.assignedTo===p2.id) p2month+=price;
-      else {const pct1=prod.pct1||50;p1month+=price*pct1/100;p2month+=price*(100-pct1)/100;}
-    });
-  });
+  const catMap={};
+  allT.forEach(t=>(t.products||[]).forEach(p=>{const c=p.category||'otro';catMap[c]=(catMap[c]||0)+parseFloat(p.finalPrice||p.price||0);}));
+  DB.expenses.filter(e=>e.confirmed).forEach(e=>{const c=e.category||'otro';catMap[c]=(catMap[c]||0)+parseFloat(e.total||0);});
+  const catSorted=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const catMax=catSorted[0]?catSorted[0][1]:1;
 
-  // Category breakdown
-  const catMap = {};
-  allConfirmed.forEach(t=>{
-    (t.products||[]).forEach(prod=>{
-      const cat=prod.category||'otro';
-      catMap[cat]=(catMap[cat]||0)+(parseFloat(prod.finalPrice||prod.price||0));
-    });
-  });
-  DB.expenses.filter(e=>e.confirmed).forEach(e=>{
-    const cat=e.category||'otro';
-    catMap[cat]=(catMap[cat]||0)+(parseFloat(e.total)||0);
-  });
-  const catSorted = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  const catMax = catSorted[0]?catSorted[0][1]:1;
-
-  // Store breakdown
   const storeMap={};
-  allConfirmed.forEach(t=>{if(t.store){storeMap[t.store]=(storeMap[t.store]||0)+(parseFloat(t.total)||0);}});
+  allT.forEach(t=>{if(t.store)storeMap[t.store]=(storeMap[t.store]||0)+(parseFloat(t.total)||0);});
   const storeSorted=Object.entries(storeMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
-  // Anomalies
-  const anomalies = detectAnomalies();
+  const anomalies=detectAnomalies();
 
-  document.getElementById('view').innerHTML = `
-    <div class="screen-header">
-      <h1>Estadísticas</h1>
-      <p>Análisis de gastos del hogar</p>
-    </div>
-
+  document.getElementById('view').innerHTML=`
+    <div class="screen-header"><h1>Estadísticas</h1><p>Análisis del hogar</p></div>
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Este mes</div>
-        <div class="stat-value">${fmt(monthTotal)}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Tickets</div>
-        <div class="stat-value">${allConfirmed.length}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label" style="color:${p1.color}">${p1.name}</div>
-        <div class="stat-value" style="color:${p1.color}">${fmt(p1month)}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label" style="color:${p2.color}">${p2.name}</div>
-        <div class="stat-value" style="color:${p2.color}">${fmt(p2month)}</div>
-      </div>
+      <div class="stat-card"><div class="stat-label">Este mes</div><div class="stat-value">${fmt(monthTotal)}</div></div>
+      <div class="stat-card"><div class="stat-label">Tickets totales</div><div class="stat-value">${allT.length}</div></div>
     </div>
-
-    ${anomalies.length>0?`
-      <div style="margin:0 16px 14px">
-        <div class="te-section-title" style="padding:0 0 8px">⚠️ Alertas de consumo</div>
-        ${anomalies.map(a=>`
-          <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--rad-sm);padding:10px 12px;margin-bottom:8px;font-size:13px;color:#f59e0b">${a}</div>
-        `).join('')}
-      </div>
-    `:''}
-
-    ${catSorted.length>0?`
-      <div class="recent-label">Gasto por categoría</div>
-      <div class="bar-chart">
-        ${catSorted.map(([cat,amt])=>{
-          const catInfo = EXPENSE_CATS.find(c=>c.id===cat)||{label:cat,emoji:'📦'};
-          const pct = Math.round(amt/catMax*100);
-          return `
-            <div class="bar-row">
-              <div class="bar-name">${catInfo.emoji} ${catInfo.label||cat}</div>
-              <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--accent)"></div></div>
-              <div class="bar-amt">${fmt(amt)}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `:''}
-
-    ${storeSorted.length>0?`
-      <div class="recent-label">Supermercados más usados</div>
-      <div class="bar-chart">
-        ${storeSorted.map(([store,amt],i)=>{
-          const colors=['var(--accent)','var(--green)','var(--blue)','var(--amber)','var(--red)'];
-          const pct = Math.round(amt/storeSorted[0][1]*100);
-          return `
-            <div class="bar-row">
-              <div class="bar-name">🏪 ${store}</div>
-              <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${colors[i%colors.length]}"></div></div>
-              <div class="bar-amt">${fmt(amt)}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `:''}
-
-    <div class="recent-label" style="margin-top:8px">Despensa estimada</div>
-    ${renderInventorySection()}
-  `;
+    ${anomalies.length?`<div style="margin:0 16px 14px">${anomalies.map(a=>`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--rad-sm);padding:10px 12px;margin-bottom:8px;font-size:13px;color:#f59e0b">⚠️ ${a}</div>`).join('')}</div>`:''}
+    ${catSorted.length?`<div class="recent-label">Gasto por categoría</div><div class="bar-chart">${catSorted.map(([cat,amt])=>{const ci=EXPENSE_CATS.find(c=>c.id===cat)||{label:cat,emoji:'📦'};return`<div class="bar-row"><div class="bar-name">${ci.emoji} ${ci.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(amt/catMax*100)}%;background:var(--accent)"></div></div><div class="bar-amt">${fmt(amt)}</div></div>`;}).join('')}</div>`:''}
+    ${storeSorted.length?`<div class="recent-label">Supermercados</div><div class="bar-chart">${storeSorted.map(([s,a],i)=>{const cols=['var(--accent)','var(--green)','var(--blue)','var(--amber)','var(--red)'];return`<div class="bar-row"><div class="bar-name">🏪 ${s}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(a/storeSorted[0][1]*100)}%;background:${cols[i]}"></div></div><div class="bar-amt">${fmt(a)}</div></div>`;}).join('')}</div>`:''}
+    <div class="recent-label">Despensa estimada</div>${renderInventorySection()}`;
 }
 
 function detectAnomalies(){
-  const msgs = [];
-  const now = new Date();
-  const thisMonth = DB.tickets.filter(t=>t.confirmed&&t.date&&new Date(t.date).getMonth()===now.getMonth());
-  const lastMonth = DB.tickets.filter(t=>{
-    if(!t.confirmed||!t.date) return false;
-    const d=new Date(t.date);
-    return d.getMonth()===(now.getMonth()-1+12)%12;
-  });
-  const thisTotal = thisMonth.reduce((s,t)=>s+(parseFloat(t.total)||0),0);
-  const lastTotal = lastMonth.reduce((s,t)=>s+(parseFloat(t.total)||0),0);
-  if(lastTotal>0&&thisTotal>lastTotal*1.3){
-    msgs.push(`Este mes gastáis un ${Math.round((thisTotal/lastTotal-1)*100)}% más que el mes pasado.`);
-  }
-  // Detect expensive products
-  const priceMap={};
-  DB.tickets.filter(t=>t.confirmed).forEach(t=>{
-    (t.products||[]).forEach(p=>{
-      const key=normalizeKey(p.name||'');
-      if(!key) return;
-      const pr=parseFloat(p.finalPrice||p.price||0);
-      if(!priceMap[key]) priceMap[key]={prices:[],name:p.name};
-      priceMap[key].prices.push(pr);
-    });
-  });
-  Object.entries(priceMap).forEach(([k,v])=>{
-    if(v.prices.length<3) return;
-    const avg=v.prices.slice(0,-1).reduce((s,x)=>s+x,0)/(v.prices.length-1);
-    const last=v.prices[v.prices.length-1];
-    if(last>avg*1.25&&avg>0.5){
-      msgs.push(`El precio de "${v.name}" ha subido un ${Math.round((last/avg-1)*100)}% respecto a tu media habitual.`);
-    }
-  });
-  return msgs.slice(0,3);
+  const now=new Date();
+  const msgs=[];
+  const thisT=DB.tickets.filter(t=>t.confirmed&&t.date&&new Date(t.date).getMonth()===now.getMonth());
+  const lastT=DB.tickets.filter(t=>t.confirmed&&t.date&&new Date(t.date).getMonth()===(now.getMonth()-1+12)%12);
+  const tTotal=thisT.reduce((s,t)=>s+parseFloat(t.total||0),0);
+  const lTotal=lastT.reduce((s,t)=>s+parseFloat(t.total||0),0);
+  if(lTotal>0&&tTotal>lTotal*1.3) msgs.push(`Este mes gastáis un ${Math.round((tTotal/lTotal-1)*100)}% más que el mes pasado.`);
+  return msgs;
 }
 
 function renderInventorySection(){
-  const predictions = getPredictions();
-  if(predictions.length===0){
-    return `<div class="empty-state" style="padding:20px"><p>Introduce más tickets para estimar la despensa</p></div>`;
-  }
-  return predictions.slice(0,8).map(p=>{
-    const pct = Math.max(0,Math.min(100,100-Math.round((p.days/p.freq)*100)));
-    const color = pct<30?'var(--red)':pct<60?'var(--amber)':'var(--green)';
-    return `
-      <div class="inv-row">
-        <div class="inv-name">${p.emoji} ${p.name}</div>
-        <div class="inv-bar-track" style="flex:1;margin:0 10px"><div class="inv-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-        <div class="inv-days">~${p.days}d</div>
-      </div>
-    `;
+  const preds=getPredictions();
+  if(!preds.length) return`<div class="empty-state" style="padding:20px"><p>Añade más tickets para estimar la despensa</p></div>`;
+  return preds.slice(0,8).map(p=>{
+    const pct=Math.max(0,Math.min(100,100-Math.round((p.days/p.freq)*100)));
+    const col=pct<30?'var(--red)':pct<60?'var(--amber)':'var(--green)';
+    return`<div class="inv-row"><div class="inv-name">${p.emoji} ${p.name}</div><div class="inv-bar-track"><div class="inv-bar-fill" style="width:${pct}%;background:${col}"></div></div><div class="inv-days">~${p.days}d</div></div>`;
   }).join('');
 }
 
 function getPredictions(){
-  const productHistory={};
+  const ph={};
   DB.tickets.filter(t=>t.confirmed&&t.date).forEach(t=>{
     const d=new Date(t.date).getTime();
-    (t.products||[]).forEach(prod=>{
-      const key=normalizeKey(prod.name||'');
-      if(!key) return;
-      if(!productHistory[key]) productHistory[key]={name:prod.name,dates:[],category:prod.category||'otro'};
-      productHistory[key].dates.push(d);
+    (t.products||[]).forEach(p=>{
+      const k=normalizeKey(p.name||'');if(!k)return;
+      if(!ph[k])ph[k]={name:p.name,dates:[],category:p.category||'otro'};
+      ph[k].dates.push(d);
     });
   });
-
-  const now=Date.now();
-  const results=[];
-  Object.values(productHistory).forEach(item=>{
-    if(item.dates.length<2) return;
+  const now=Date.now(),catE={alimentación:'🥫',higiene:'🧴',limpieza:'🧹',bebidas:'🧃',lácteos:'🥛',fruta:'🍎',carne:'🥩',pescado:'🐟',otro:'📦'};
+  return Object.values(ph).filter(v=>v.dates.length>=2).map(item=>{
     item.dates.sort((a,b)=>a-b);
-    const gaps=[];
-    for(let i=1;i<item.dates.length;i++) gaps.push((item.dates[i]-item.dates[i-1])/(1000*60*60*24));
+    const gaps=[];for(let i=1;i<item.dates.length;i++)gaps.push((item.dates[i]-item.dates[i-1])/864e5);
     const avgFreq=gaps.reduce((s,g)=>s+g,0)/gaps.length;
-    const lastDate=item.dates[item.dates.length-1];
-    const daysSince=(now-lastDate)/(1000*60*60*24);
+    const daysSince=(now-item.dates[item.dates.length-1])/864e5;
     const daysLeft=Math.max(0,Math.round(avgFreq-daysSince));
-
-    const catEmojis={alimentación:'🥫',higiene:'🧴',limpieza:'🧹',bebidas:'🧃',congelados:'❄️',lácteos:'🥛',fruta:'🍎',carne:'🥩',pescado:'🐟',otro:'📦'};
-    results.push({
-      name:item.name,days:daysLeft,freq:Math.round(avgFreq),
-      emoji:catEmojis[item.category]||'🛒',
-      detail:`Cada ~${Math.round(avgFreq)} días · última vez hace ${Math.round(daysSince)}d`
-    });
-  });
-  return results.sort((a,b)=>a.days-b.days);
+    return{name:item.name,days:daysLeft,freq:Math.round(avgFreq),emoji:catE[item.category]||'🛒',detail:`Cada ~${Math.round(avgFreq)}d · hace ${Math.round(daysSince)}d`};
+  }).sort((a,b)=>a.days-b.days);
 }
 
-// ── SETTINGS SCREEN ────────────────────────────────────────────
+// ── SETTINGS ───────────────────────────────────────────────────
 function renderSettings(){
-  const p1=DB.persons[0],p2=DB.persons[1];
-  document.getElementById('view').innerHTML = `
+  document.getElementById('view').innerHTML=`
     <div class="screen-header">
-      <h1>Configuración</h1>
-      <p>Clarito · Tu hogar inteligente</p>
+      <div style="display:flex;align-items:center;gap:10px">
+        <img src="https://static.thenounproject.com/png/robot-icon-8195198-512.png" style="width:28px;height:28px;border-radius:8px" onerror="this.style.display='none'"/>
+        <h1>Configuración</h1>
+      </div>
     </div>
-
     <div class="settings-section">
-      <div class="settings-section-title">Personas</div>
+      <div class="settings-section-title">Personas (${DB.persons.length})</div>
       <div style="background:var(--bg1)">
-        <div class="settings-row" onclick="editPerson(0)" style="cursor:pointer">
-          <div class="settings-icon" style="background:${p1.color}"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
-          <div class="settings-label">${p1.name}</div>
-          <div class="settings-value">${p1.cards.length} tarjeta(s)</div>
-          <div class="settings-arrow">›</div>
-        </div>
-        <div class="settings-row" onclick="editPerson(1)" style="cursor:pointer">
-          <div class="settings-icon" style="background:${p2.color}"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
-          <div class="settings-label">${p2.name}</div>
-          <div class="settings-value">${p2.cards.length} tarjeta(s)</div>
-          <div class="settings-arrow">›</div>
+        ${DB.persons.map((p,i)=>`
+          <div class="settings-row" onclick="editPerson(${i})">
+            <div class="settings-icon" style="background:${p.color}"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+            <div class="settings-label">${p.name}</div>
+            <div class="settings-value">${p.cards.length} tarjeta(s)</div>
+            <div class="settings-arrow">›</div>
+          </div>`).join('')}
+        <div class="settings-row" onclick="addPerson()">
+          <div class="settings-icon" style="background:var(--bg4)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--txt1)" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+          <div class="settings-label" style="color:var(--accent)">Añadir persona</div>
         </div>
       </div>
     </div>
-
     <div class="settings-section">
-      <div class="settings-section-title">API & Seguridad</div>
+      <div class="settings-section-title">API Key</div>
       <div style="background:var(--bg1)">
-        <div class="settings-row" onclick="editApiKey()" style="cursor:pointer">
+        <div class="settings-row" onclick="editApiKey()">
           <div class="settings-icon" style="background:#374151"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
-          <div class="settings-label">API Key Gemini</div>
-          <div class="settings-value">${DB.apiKey?'•••••'+DB.apiKey.slice(-4):'No configurada'}</div>
+          <div class="settings-label">Gemini API Key</div>
+          <div class="settings-value">${DB.apiKey?'•••'+DB.apiKey.slice(-4):'No configurada'}</div>
           <div class="settings-arrow">›</div>
         </div>
       </div>
     </div>
-
     <div class="settings-section">
       <div class="settings-section-title">Tarjetas conocidas</div>
       <div style="background:var(--bg1)">
-        ${Object.keys(DB.knowledge.cards).length===0?`
-          <div class="settings-row"><div class="settings-label" style="color:var(--txt2)">No hay tarjetas registradas</div></div>
-        `:Object.entries(DB.knowledge.cards).map(([last4,pid])=>`
-          <div class="settings-row">
-            <div class="settings-icon" style="background:#1e3a5f"><svg viewBox="0 0 24 24" fill="none"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
-            <div class="settings-label">•••• ${last4}</div>
-            <div class="settings-value">
-              <span style="color:${personColor(pid)};font-weight:600">${personName(pid)}</span>
-            </div>
-            <button onclick="forgetCard('${last4}')" style="color:var(--red);font-size:18px;padding:0 4px">×</button>
-          </div>
-        `).join('')}
+        ${Object.keys(DB.knowledge.cards).length===0
+          ?`<div class="settings-row"><div class="settings-label" style="color:var(--txt2)">Sin tarjetas registradas</div></div>`
+          :Object.entries(DB.knowledge.cards).map(([l4,pid])=>`
+            <div class="settings-row">
+              <div class="settings-icon" style="background:#1e3a5f"><svg viewBox="0 0 24 24" fill="none"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+              <div class="settings-label">•••• ${l4}</div>
+              <div class="settings-value" style="color:${personColor(pid)};font-weight:600">${personName(pid)}</div>
+              <button onclick="forgetCard('${l4}')" style="color:var(--red);font-size:20px">×</button>
+            </div>`).join('')}
       </div>
     </div>
-
-    <div class="settings-section">
-      <div class="settings-section-title">Conocimiento aprendido</div>
-      <div style="background:var(--bg1)">
-        <div class="settings-row">
-          <div class="settings-label">Productos aprendidos</div>
-          <div class="settings-value">${Object.keys(DB.knowledge.products).length}</div>
-        </div>
-        <div class="settings-row" onclick="clearKnowledge()" style="cursor:pointer">
-          <div class="settings-label" style="color:var(--red)">Borrar todo el conocimiento</div>
-        </div>
-      </div>
-    </div>
-
     <div class="settings-section">
       <div class="settings-section-title">Datos</div>
       <div style="background:var(--bg1)">
-        <div class="settings-row" onclick="exportData()" style="cursor:pointer">
-          <div class="settings-label">Exportar datos (JSON)</div>
-          <div class="settings-arrow">↓</div>
-        </div>
-        <div class="settings-row" onclick="resetAll()" style="cursor:pointer">
-          <div class="settings-label" style="color:var(--red)">Borrar todos los datos</div>
-        </div>
+        <div class="settings-row"><div class="settings-label">Productos aprendidos</div><div class="settings-value">${Object.keys(DB.knowledge.products).length}</div></div>
+        <div class="settings-row" onclick="clearKnowledge()"><div class="settings-label" style="color:var(--red)">Borrar conocimiento</div></div>
+        <div class="settings-row" onclick="exportData()"><div class="settings-label">Exportar JSON</div><div class="settings-arrow">↓</div></div>
+        <div class="settings-row" onclick="resetAll()"><div class="settings-label" style="color:var(--red)">Borrar todos los datos</div></div>
       </div>
     </div>
+    <p style="text-align:center;font-size:11px;color:var(--txt3);padding:20px">Clarito · Datos guardados localmente en tu dispositivo.</p>`;
+}
 
-    <p style="text-align:center;font-size:11px;color:var(--txt3);padding:20px">
-      Clarito · Todos los datos se guardan localmente en tu dispositivo.
-    </p>
-  `;
+function addPerson(){
+  const idx=DB.persons.length;
+  DB.persons.push({id:'p'+(idx+1),name:'Persona '+(idx+1),color:PRESET_COLORS[idx%PRESET_COLORS.length],cards:[]});
+  saveDB();renderSettings();editPerson(idx);
 }
 
 function editPerson(idx){
-  const p = DB.persons[idx];
-  const cardsHtml = (p.cards||[]).map((c,ci)=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--brd)">
-      <div style="font-size:14px;flex:1">•••• ${c}</div>
-      <button onclick="removeCard(${idx},${ci})" style="color:var(--red)">×</button>
+  const p=DB.persons[idx];
+  openModal(`<div class="modal-title">Editar ${p.name}</div>
+    <div class="field-row"><label class="field-label">Nombre</label><input id="ep-name" value="${p.name}"/></div>
+    <div class="field-row" style="margin-top:10px"><label class="field-label">Color</label>
+      <div class="color-picker-row" id="ep-colors">${PRESET_COLORS.map(c=>`<div class="color-swatch ${p.color===c?'selected':''}" style="background:${c}" onclick="pickPersonColor(${idx},'${c}',this)"></div>`).join('')}</div>
     </div>
-  `).join('');
-
-  openModal(`
-    <div class="modal-title">Editar ${p.name}</div>
-    <div class="field-row">
-      <label class="field-label">Nombre</label>
-      <input id="ep-name" value="${p.name}"/>
-    </div>
-    <div class="field-row" style="margin-top:10px">
-      <label class="field-label">Color</label>
-      <div class="color-picker-row" id="ep-colors">
-        ${PRESET_COLORS.map(c=>`<div class="color-swatch ${p.color===c?'selected':''}" style="background:${c}" onclick="pickPersonColor(${idx},'${c}')"></div>`).join('')}
-      </div>
-    </div>
-    <div style="margin-top:16px">
+    <div style="margin-top:14px">
       <label class="field-label">Tarjetas (últimos 4 dígitos)</label>
-      ${cardsHtml}
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <input id="ep-card" placeholder="ej: 4821" maxlength="4" style="width:100px;letter-spacing:2px"/>
-        <button class="btn-secondary" onclick="addCard(${idx})">Añadir</button>
-      </div>
+      <div id="ep-cards">${(p.cards||[]).map((c,ci)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--brd)"><div style="flex:1;font-size:14px">•••• ${c}</div><button onclick="removeCard(${idx},${ci})" style="color:var(--red)">×</button></div>`).join('')}</div>
+      <div style="display:flex;gap:8px;margin-top:10px"><input id="ep-card" placeholder="4821" maxlength="4" style="width:90px;letter-spacing:2px"/><button class="btn-secondary" onclick="addCard(${idx})">Añadir</button></div>
     </div>
-    <div style="display:flex;gap:10px;margin-top:20px">
+    ${DB.persons.length>1?`<button class="btn-danger" style="width:100%;margin-top:14px" onclick="removePerson(${idx})">Eliminar persona</button>`:''}
+    <div style="display:flex;gap:10px;margin-top:14px">
       <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
       <button class="btn-primary" style="flex:2" onclick="savePerson(${idx})">Guardar</button>
-    </div>
-  `);
+    </div>`);
 }
 
-function pickPersonColor(idx,color){
-  DB.persons[idx].color=color;
-  document.querySelectorAll('#ep-colors .color-swatch').forEach(s=>s.classList.remove('selected'));
-  event.target.classList.add('selected');
-}
-function addCard(idx){
-  const val=document.getElementById('ep-card').value.trim();
-  if(val.length!==4||isNaN(val)){showToast('Introduce 4 dígitos');return;}
-  if(!DB.persons[idx].cards) DB.persons[idx].cards=[];
-  DB.persons[idx].cards.push(val);
-  DB.knowledge.cards[val]=DB.persons[idx].id;
-  editPerson(idx);
-}
-function removeCard(idx,ci){
-  const card=DB.persons[idx].cards[ci];
-  DB.persons[idx].cards.splice(ci,1);
-  delete DB.knowledge.cards[card];
-  editPerson(idx);
-}
-function savePerson(idx){
-  const name=document.getElementById('ep-name').value.trim();
-  if(name) DB.persons[idx].name=name;
-  saveDB();
-  closeModal();
-  renderSettings();
-}
-function forgetCard(last4){
-  delete DB.knowledge.cards[last4];
-  saveDB();
-  renderSettings();
-}
-function clearKnowledge(){
-  openModal(`
-    <div class="modal-title">¿Borrar conocimiento?</div>
-    <p style="font-size:14px;color:var(--txt1);margin-bottom:20px">Se eliminarán todos los productos aprendidos. Los tickets no se borrarán.</p>
-    <div style="display:flex;gap:10px">
-      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
-      <button class="btn-danger" style="flex:1" onclick="doResetKnowledge()">Borrar</button>
-    </div>
-  `);
-}
-function doResetKnowledge(){
-  DB.knowledge.products={};
-  saveDB();closeModal();renderSettings();
-  showToast('Conocimiento borrado');
-}
-function editApiKey(){
-  openModal(`
-    <div class="modal-title">API Key de Gemini</div>
-    <p style="font-size:13px;color:var(--txt2);margin-bottom:12px">Obtén tu key gratuita en aistudio.google.com</p>
-    <input type="password" id="new-apikey" value="${DB.apiKey||''}" placeholder="AIza..."/>
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" style="flex:2" onclick="saveApiKey()">Guardar</button>
-    </div>
-  `);
-}
-function saveApiKey(){
-  const k=document.getElementById('new-apikey').value.trim();
-  if(!k){showToast('API key vacía');return;}
-  DB.apiKey=k;S.set('apiKey',k);saveDB();closeModal();
-  showToast('API key guardada ✓');renderSettings();
-}
-function exportData(){
-  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='clarito-backup-'+new Date().toISOString().slice(0,10)+'.json';
-  a.click();
-}
-function resetAll(){
-  openModal(`
-    <div class="modal-title">⚠️ ¿Borrar todo?</div>
-    <p style="font-size:14px;color:var(--txt1);margin-bottom:20px">Se borrarán todos los tickets, gastos y conocimiento. Esta acción no se puede deshacer.</p>
-    <div style="display:flex;gap:10px">
-      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
-      <button class="btn-danger" style="flex:1" onclick="doResetAll()">Borrar todo</button>
-    </div>
-  `);
-}
-function doResetAll(){
-  localStorage.clear();
-  location.reload();
-}
+function pickPersonColor(idx,color,el){DB.persons[idx].color=color;document.querySelectorAll('#ep-colors .color-swatch').forEach(s=>s.classList.remove('selected'));el.classList.add('selected');}
+function addCard(idx){const v=document.getElementById('ep-card').value.trim();if(v.length!==4||isNaN(v)){showToast('Introduce 4 dígitos');return;}if(!DB.persons[idx].cards)DB.persons[idx].cards=[];DB.persons[idx].cards.push(v);DB.knowledge.cards[v]=DB.persons[idx].id;editPerson(idx);}
+function removeCard(idx,ci){const c=DB.persons[idx].cards[ci];DB.persons[idx].cards.splice(ci,1);delete DB.knowledge.cards[c];editPerson(idx);}
+function removePerson(idx){if(DB.persons.length<=1){showToast('Debe haber al menos una persona');return;}DB.persons.splice(idx,1);saveDB();closeModal();renderSettings();}
+function savePerson(idx){const n=document.getElementById('ep-name').value.trim();if(n)DB.persons[idx].name=n;saveDB();closeModal();renderSettings();}
+function forgetCard(l4){delete DB.knowledge.cards[l4];saveDB();renderSettings();}
+function clearKnowledge(){openModal(`<div class="modal-title">¿Borrar conocimiento?</div><p style="font-size:14px;color:var(--txt1);margin-bottom:20px">Se eliminan los productos aprendidos. Los tickets se conservan.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="DB.knowledge.products={};saveDB();closeModal();renderSettings();showToast('Borrado')">Borrar</button></div>`);}
+function editApiKey(){openModal(`<div class="modal-title">API Key de Gemini</div><p style="font-size:13px;color:var(--txt2);margin-bottom:12px">Obtén tu key gratuita en aistudio.google.com</p><input type="password" id="new-apikey" value="${DB.apiKey||''}" placeholder="AIza..."/><div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-primary" style="flex:2" onclick="const k=document.getElementById('new-apikey').value.trim();if(!k){showToast('Vacía');return;}DB.apiKey=k;S.set('apiKey',k);saveDB();closeModal();showToast('Guardada ✓');renderSettings()">Guardar</button></div>`);}
+function exportData(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='clarito-'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+function resetAll(){openModal(`<div class="modal-title">⚠️ ¿Borrar todo?</div><p style="font-size:14px;color:var(--txt1);margin-bottom:20px">Se borrarán todos los datos. No se puede deshacer.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="localStorage.clear();location.reload()">Borrar todo</button></div>`);}
 
 // ── AI CHAT ────────────────────────────────────────────────────
-function openAIChat(){
-  renderAIChat();
-  document.getElementById('ai-chat-sheet').style.display='flex';
-}
+function openAIChat(){renderAIChat();document.getElementById('ai-chat-sheet').style.display='flex';}
+function closeAIChat(){document.getElementById('ai-chat-sheet').style.display='none';updateAIBadge();}
 
 function renderAIChat(){
-  const sheet = document.getElementById('ai-chat-sheet');
-  const pending = DB.aiQuestions.filter(q=>!q.answered);
-
-  sheet.innerHTML = `
+  const pending=DB.aiQuestions.filter(q=>!q.answered);
+  document.getElementById('ai-chat-sheet').innerHTML=`
     <div class="ai-header">
-      <button onclick="closeAIChat()" style="color:var(--txt1)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <button onclick="closeAIChat()" style="color:var(--txt1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       <h2>Asistente IA</h2>
-      ${pending.length>0?`<span class="badge badge-red">${pending.length} pendientes</span>`:''}
+      ${pending.length?`<span class="badge badge-red">${pending.length}</span>`:''}
     </div>
     <div class="ai-messages" id="ai-messages">
-      ${pending.length>0?`
-        <div class="ai-msg bot">Tengo ${pending.length} pregunta${pending.length>1?'s':''} para aprender mejor:</div>
-        ${pending.slice(0,5).map(q=>renderAIQuestion(q)).join('')}
-      `:`<div class="ai-msg bot">¡Hola! Soy tu asistente de Clarito. Pregúntame sobre gastos, balances, predicciones o lo que necesites.</div>`}
+      ${pending.length?`<div class="ai-msg bot">Tengo ${pending.length} pregunta${pending.length>1?'s':''} para aprender mejor:</div>${pending.slice(0,5).map(q=>renderAIQuestion(q)).join('')}`
+        :`<div class="ai-msg bot">¡Hola! Soy tu asistente de Clarito. Pregúntame sobre gastos, balances o predicciones.</div>`}
       ${DB.aiConvMessages.slice(-10).map(m=>`<div class="ai-msg ${m.role}">${m.content}</div>`).join('')}
     </div>
     <div class="ai-input-row">
       <input id="ai-input" placeholder="Pregunta algo..." onkeydown="if(event.key==='Enter')sendAIMessage()"/>
-      <button class="ai-send" onclick="sendAIMessage()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      </button>
-    </div>
-  `;
+      <button class="ai-send" onclick="sendAIMessage()"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+    </div>`;
 }
 
 function renderAIQuestion(q){
-  return `
-    <div class="ai-qa" id="qa-${q.id}">
-      <div class="ai-qa-q">${q.question}</div>
-      <div class="ai-qa-btns">
-        ${(q.options||['Sí','No']).map(opt=>`
-          <button class="ai-qa-btn" onclick="answerAIQuestion('${q.id}','${opt}')">${opt}</button>
-        `).join('')}
-        <button class="ai-qa-btn" onclick="answerAIQuestion('${q.id}','skip')" style="color:var(--txt3)">Saltar</button>
-      </div>
+  return`<div class="ai-qa" id="qa-${q.id}">
+    <div class="ai-qa-q">${q.question}</div>
+    <div class="ai-qa-btns">
+      ${(q.options||['Sí','No']).map(opt=>`<button class="ai-qa-btn" onclick="answerAIQuestion('${q.id}','${opt}')">${opt}</button>`).join('')}
+      <button class="ai-qa-btn" onclick="answerAIQuestion('${q.id}','skip')" style="color:var(--txt3)">Saltar</button>
     </div>
-  `;
+  </div>`;
 }
 
-function answerAIQuestion(qid, answer){
-  const q = DB.aiQuestions.find(x=>x.id===qid);
-  if(!q) return;
+function answerAIQuestion(qid,answer){
+  const q=DB.aiQuestions.find(x=>x.id===qid);if(!q)return;
   q.answered=true;q.answer=answer;
-  // Apply learning
   if(q.type==='product_assign'&&answer!=='skip'){
     const key=normalizeKey(q.productName||'');
     if(key){
-      const personId=answer==='skip'?null:(answer==='Compartido'?null:q.personId||null);
-      DB.knowledge.products[key]={
-        ...(DB.knowledge.products[key]||{}),
-        person:personId,shared:!personId,pct1:50
-      };
+      const pid=DB.persons.find(p=>p.name===answer)?.id||null;
+      DB.knowledge.products[key]={...(DB.knowledge.products[key]||{}),person:pid,shared:!pid,pct1:50};
     }
-  } else if(q.type==='card_assign'&&answer!=='skip'&&q.personId){
-    DB.knowledge.cards[q.last4]=q.personId;
+  }else if(q.type==='card_assign'&&answer!=='skip'){
+    const pid=DB.persons.find(p=>p.name===answer)?.id;
+    if(pid)DB.knowledge.cards[q.last4]=pid;
   }
-  saveDB();
-  updateAIBadge();
-  // Remove the question element
+  saveDB();updateAIBadge();
   const el=document.getElementById('qa-'+qid);
-  if(el){el.style.opacity='0.4';el.querySelector('.ai-qa-btns').innerHTML='<span style="font-size:12px;color:var(--txt2)">✓ Respondido</span>';}
+  if(el){el.style.opacity='.4';el.querySelector('.ai-qa-btns').innerHTML='<span style="font-size:12px;color:var(--txt2)">✓ Respondido</span>';}
 }
 
 async function sendAIMessage(){
   const input=document.getElementById('ai-input');
-  const msg=input.value.trim();
-  if(!msg) return;
+  const msg=input.value.trim();if(!msg)return;
   input.value='';
-
-  DB.aiConvMessages.push({role:'user',content:msg});
-  renderAIChat();
-
-  // Build context
-  const {p1balance,p2balance,owes,amount}=calcBalance();
-  const context=`
-Eres el asistente de Clarito, una app de gestión de gastos domésticos compartidos.
-Personas: ${DB.persons.map(p=>p.name).join(' y ')}.
-Balance actual: ${amount>0?`${personName(owes)} debe ${fmt(amount)}`:'cuentas al día'}.
-Tickets registrados: ${DB.tickets.filter(t=>t.confirmed).length}.
-Gastos manuales: ${DB.expenses.filter(e=>e.confirmed).length}.
-Responde de forma amigable, breve y en español. Máximo 3 párrafos.
-`;
-
-  try {
-    const resp = await callGemini(context+'\n\nPregunta del usuario: '+msg, null, null, null);
-    DB.aiConvMessages.push({role:'bot',content:resp});
-    saveDB();
-    renderAIChat();
-    // Scroll to bottom
-    const msgs=document.getElementById('ai-messages');
-    if(msgs) msgs.scrollTop=msgs.scrollHeight;
-  } catch(err){
-    DB.aiConvMessages.push({role:'bot',content:'Lo siento, no pude conectar con la IA: '+err.message});
-    renderAIChat();
+  DB.aiConvMessages.push({role:'user',content:msg});renderAIChat();
+  const {paid,owes,amount}=calcBalance();
+  const ctx=`Eres el asistente de Clarito, app de gastos compartidos. Personas: ${DB.persons.map(p=>p.name).join(', ')}. Balance: ${amount>0.01?personName(owes)+' debe '+fmt(amount):'al día'}. Tickets: ${DB.tickets.filter(t=>t.confirmed).length}. Responde en español, breve y amigable.`;
+  try{
+    const resp=await callGemini(ctx+'\nPregunta: '+msg,null,null);
+    DB.aiConvMessages.push({role:'bot',content:resp});saveDB();renderAIChat();
+    const msgs=document.getElementById('ai-messages');if(msgs)msgs.scrollTop=msgs.scrollHeight;
+  }catch(err){
+    DB.aiConvMessages.push({role:'bot',content:'Error: '+err.message});renderAIChat();
   }
-}
-
-function closeAIChat(){
-  document.getElementById('ai-chat-sheet').style.display='none';
-  updateAIBadge();
 }
 
 function updateAIBadge(){
-  const pending=(DB.aiQuestions||[]).filter(q=>!q.answered).length;
-  const badge=document.getElementById('ai-badge');
-  if(badge){
-    badge.style.display=pending>0?'flex':'none';
-    badge.textContent=pending;
-  }
+  const n=(DB.aiQuestions||[]).filter(q=>!q.answered).length;
+  const b=document.getElementById('ai-badge');
+  if(b){b.style.display=n>0?'flex':'none';b.textContent=n;}
 }
 
 function generateAIQuestions(ticket){
-  const newQs=[];
-  // Unknown card?
+  const qs=[];
   if(ticket.last4&&!DB.knowledge.cards[ticket.last4]){
-    DB.persons.forEach(p=>{
-      // Check if it might match a known card pattern
-    });
-    // Ask who owns it
-    const q={
-      id:uid(),type:'card_assign',answered:false,last4:ticket.last4,
-      question:`¿La tarjeta terminada en ${ticket.last4} pertenece a ${DB.persons[0].name} o a ${DB.persons[1].name}?`,
-      options:[DB.persons[0].name,DB.persons[1].name],
-      personId:DB.persons[0].id
-    };
-    // Actually make it pick
-    q.options=[DB.persons[0].name,DB.persons[1].name];
-    newQs.push(q);
+    qs.push({id:uid(),type:'card_assign',answered:false,last4:ticket.last4,question:`¿La tarjeta •••• ${ticket.last4} pertenece a...?`,options:DB.persons.map(p=>p.name)});
   }
-  // Products with low confidence
   (ticket.products||[]).filter(p=>p.confidence<0.6&&!p.knownMatch).forEach(p=>{
     const key=normalizeKey(p.name||'');
     if(!DB.knowledge.products[key]){
-      newQs.push({
-        id:uid(),type:'product_assign',answered:false,
-        productName:p.name,
-        question:`"${p.name}" (${fmt(p.finalPrice||0)}) · ¿A quién pertenece o es compartido?`,
-        options:[DB.persons[0].name,DB.persons[1].name,'Compartido'],
-        personId:null
-      });
+      qs.push({id:uid(),type:'product_assign',answered:false,productName:p.name,question:`"${p.name}" (${fmt(p.finalPrice||0)}) · ¿De quién es?`,options:[...DB.persons.map(p=>p.name),'Compartido']});
     }
   });
-  if(newQs.length>0){
-    DB.aiQuestions.push(...newQs);
-    saveDB();
-    updateAIBadge();
-  }
+  if(qs.length){DB.aiQuestions.push(...qs);saveDB();updateAIBadge();}
 }
 
 // ── BOOT ──────────────────────────────────────────────────────
-function boot(){
-  loadDB();
-  const needsSetup = !DB.apiKey || DB.persons[0].name==='Persona A';
-  if(needsSetup){
-    startSetup();
-  } else {
-    document.getElementById('setup-screen').style.display='none';
-    showScreen('home');
-    updateAIBadge();
-  }
-}
-
-boot();
+loadDB();
+const needsSetup=!DB.apiKey;
+if(needsSetup){startSetup();}
+else{document.getElementById('setup-screen').style.display='none';showScreen('home');updateAIBadge();}
 </script>
 </body>
 </html>
