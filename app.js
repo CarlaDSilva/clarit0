@@ -208,91 +208,7 @@ function imageToBase64(file,maxW=900,quality=0.78){
   });
 }
 
-// ── JS TICKET PARSER ───────────────────────────────────────────
-const STORES=['mercadona','lidl','dia ','carrefour','aldi','eroski','alcampo','consum','bonpreu','condis','hipercor','supercor','ahorro','plusfresc','maxi'];
-const CAT_KW={
-  alimentación:['arroz','pasta','aceite','sal ','azucar','harina','conserva','tomate','atun','sopa','caldo','garbanzo','lenteja','galleta','cereal','pan','tostada','mermelada','mayonesa'],
-  lácteos:['leche','yogur','queso','mantequilla','nata','kefir','batido'],
-  fruta:['manzana','naranja','plátano','lechuga','zanahoria','cebolla','pimiento','verdura','ensalada','espinaca','brocoli','fruta'],
-  carne:['pollo','cerdo','ternera','pechuga','filete','lomo','jamón','chorizo','salchich','bacon','carne'],
-  pescado:['salmón','merluza','bacalao','gamba','mejillón','pescado','sardin','atún'],
-  bebidas:['agua','zumo','refresco','cerveza','vino','cola','café','té','infusion'],
-  higiene:['jabón','gel','champú','dentif','colonia','desodorante','pañal','compresas','higien','papel wc','papel hig'],
-  limpieza:['detergente','suavizante','lejia','limpiador','bayeta','lavaplatos','papel cocina','bolsa basura'],
-  congelados:['helado','pizza','congelado'],
-};
-function guessCat(name){
-  const nl=name.toLowerCase();
-  for(const[cat,kws]of Object.entries(CAT_KW)){if(kws.some(k=>nl.includes(k)))return cat;}
-  return 'otro';
-}
-function normName(raw){
-  const abbr={'LT':'litro','KG':'kg','GR':'g','GRS':'g','ML':'ml','UDS':'uds','INT':'integral','INTEG':'integral','PROT':'proteico','DESC':'descaf','CHOC':'chocolate','VAN':'vainilla'};
-  let n=raw.toUpperCase();
-  Object.entries(abbr).forEach(([k,v])=>{n=n.replace(new RegExp('\\b'+k+'\\b','g'),v.toUpperCase());});
-  return n.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()).trim();
-}
 
-function parseTicketText(raw){
-  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
-  const result={store:'',date:null,total:0,last4:null,products:[],errors:[],warnings:[]};
-
-  // Store
-  for(const l of lines.slice(0,8)){
-    const ll=l.toLowerCase();
-    const f=STORES.find(s=>ll.includes(s));
-    if(f){result.store=f.trim().charAt(0).toUpperCase()+f.trim().slice(1);break;}
-  }
-  // Date
-  for(const l of lines){
-    const m=l.match(/\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\b/);
-    if(m){let[,d,mo,y]=m;if(y.length===2)y='20'+y;const dt=new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);if(!isNaN(dt)){result.date=dt.toISOString().slice(0,10);break;}}
-  }
-  // Card
-  for(const l of lines){
-    const m=l.match(/(?:tarjeta|card|visa|master|débito|crédito).*?(\d{4})\b/i)||l.match(/\*{2,}(\d{4})\b/);
-    if(m){result.last4=m[1];break;}
-  }
-  // Total
-  const skipTotalRx=/^(total|importe|a\s*pagar|sum[ao]?)/i;
-  let totalCands=[];
-  for(const l of lines){
-    const m=l.match(/(?:total|importe|a\s*pagar|sum[ao]?)[\s:]*(\d+[.,]\d{2})/i);
-    if(m){result.total=parseFloat(m[1].replace(',','.'));break;}
-    const m2=l.match(/^(\d+[.,]\d{2})\s*€?\s*$/);
-    if(m2)totalCands.push(parseFloat(m2[1].replace(',','.')));
-  }
-  if(!result.total&&totalCands.length)result.total=Math.max(...totalCands);
-
-  // Products
-  const priceRx=/(\d+[.,]\d{2})\s*€?\s*$/;
-  const discRx=/^[-–]\s*(\d+[.,]\d{2})/;
-  const skipRx=/^(total|iva|impuesto|ticket|gracias|fecha|tarjeta|visa|master|cif|nif|tel|efectivo|cambio|subtotal|a\s*pagar|euros?|[*=_]{3,}|\d{6,})/i;
-  let lastProd=null;
-  for(const line of lines){
-    if(skipRx.test(line))continue;
-    const disc=line.match(discRx);
-    if(disc&&lastProd){const d=parseFloat(disc[1].replace(',','.'));lastProd.discount=(lastProd.discount||0)+d;lastProd.finalPrice=Math.max(0,lastProd.finalPrice-d);lastProd.price=lastProd.finalPrice;continue;}
-    const pm=line.match(priceRx);
-    if(!pm)continue;
-    const price=parseFloat(pm[1].replace(',','.'));
-    if(price<=0||price>800)continue;
-    const rawName=line.slice(0,line.lastIndexOf(pm[1])).replace(/\s+/g,' ').trim();
-    if(rawName.length<2)continue;
-    const qm=rawName.match(/^(\d+)\s*[xX]\s*/);
-    const qty=qm?parseInt(qm[1]):1;
-    const cleanName=qm?rawName.slice(qm[0].length).trim():rawName;
-    const prod={rawName,name:normName(cleanName),price,finalPrice:price,discount:0,qty,confidence:0.82,category:guessCat(cleanName),assignedTo:null,shared:true,pct1:50};
-    result.products.push(prod);
-    lastProd=prod;
-  }
-
-  if(!result.store)result.warnings.push('No se detectó el supermercado');
-  if(!result.date)result.warnings.push('No se detectó la fecha');
-  if(!result.last4)result.warnings.push('No se detectó tarjeta bancaria');
-  if(!result.products.length)result.errors.push('No se detectaron productos con el parser local');
-  return result;
-}
 
 // ── GEMINI (texto, sin imágenes) ───────────────────────────────
 async function callGemini(prompt){
@@ -313,17 +229,7 @@ async function callGemini(prompt){
   throw new Error('No se pudo conectar con Gemini.');
 }
 
-async function geminiParseText(ocrText){
-  const knownProds=Object.entries(DB.knowledge.products).slice(0,8).map(([k,v])=>`${k}→${v.shared?'común':personName(v.person)}`).join(', ');
-  const prompt=`Analiza este texto de ticket de supermercado español. Devuelve SOLO JSON sin markdown:
-{"store":"","date":"YYYY-MM-DD o null","total":0,"last4":"4 dígitos o null","products":[{"rawName":"","name":"nombre legible normalizado","price":0,"discount":0,"qty":1,"confidence":0.85,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|congelados|otro"}],"errors":[],"warnings":[]}
-Normaliza nombres (SAL TO 500G→Salsa tomate 500g). Detecta descuentos por línea.${knownProds?' Conocidos: '+knownProds:''}
-TEXTO:
-${ocrText.slice(0,3000)}`;
-  const text=await callGemini(prompt);
-  const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-  try{return JSON.parse(clean);}catch{const m=clean.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('JSON inválido de Gemini');}
-}
+
 
 // ── MAIN PROCESS FILE ──────────────────────────────────────────
 // Flow: image → Tesseract OCR → JS parser → Gemini text fallback (if 0 products)
