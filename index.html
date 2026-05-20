@@ -467,8 +467,8 @@ function openModal(html){document.getElementById('modal-content').innerHTML=html
 function closeModal(){document.getElementById('modal-overlay').style.display='none';}
 function normalizeKey(name){return name.toLowerCase().replace(/[^a-záéíóúñ0-9]/g,' ').replace(/\s+/g,' ').trim();}
 
-// ── IMAGE → CANVAS (resize) ────────────────────────────────────
-function resizeImageToCanvas(file, maxW=1200){
+// ── IMAGE → BLOB URL (resize for OCR) ─────────────────────────
+function resizeImageToBlob(file, maxW=1400){
   return new Promise((res,rej)=>{
     const url=URL.createObjectURL(file);
     const img=new Image();
@@ -479,10 +479,12 @@ function resizeImageToCanvas(file, maxW=1200){
       const c=document.createElement('canvas');
       c.width=w;c.height=h;
       const ctx=c.getContext('2d');
-      // Slightly sharpen for OCR
-      ctx.filter='contrast(1.2) brightness(1.05)';
+      ctx.filter='contrast(1.15) brightness(1.05)';
       ctx.drawImage(img,0,0,w,h);
-      res(c);
+      c.toBlob(blob=>{
+        if(!blob) rej(new Error('No se pudo convertir la imagen'));
+        else res(URL.createObjectURL(blob));
+      },'image/jpeg',0.92);
     };
     img.onerror=()=>rej(new Error('No se pudo cargar la imagen'));
     img.src=url;
@@ -663,22 +665,34 @@ async function processFile(file){
       openTicketEditor(getEmptyTicket());
       return;
     }
-    // 1. Resize for OCR
-    setOCRStatus('Optimizando imagen para OCR...');
-    const canvas=await resizeImageToCanvas(file,1400);
+    // 1. Resize → blob URL
+    setOCRStatus('Optimizando imagen...');
+    const blobUrl=await resizeImageToBlob(file,1400);
 
-    // 2. Tesseract OCR (local, no API calls)
-    setOCRStatus('Leyendo texto del ticket (OCR local)...');
-    const worker=await Tesseract.createWorker('spa+eng',1,{
-      logger:m=>{
-        if(m.status==='recognizing text'){
-          setOCRStatus(`OCR: ${Math.round((m.progress||0)*100)}%`);
+    // 2. Tesseract OCR local
+    setOCRStatus('Iniciando OCR...');
+    let worker;
+    try{
+      worker=await Tesseract.createWorker('eng',1,{
+        workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/worker.min.js',
+        langPath:'https://tessdata.projectnaptha.com/4.0.0',
+        corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@4/tesseract-core.wasm.js',
+        logger:m=>{
+          if(m.status==='recognizing text')
+            setOCRStatus('OCR: '+Math.round((m.progress||0)*100)+'%');
         }
-      }
-    });
-    const {data:{text}}=await worker.recognize(canvas);
-    await worker.terminate();
-    ocrText=text;
+      });
+    }catch(e){
+      throw new Error('No se pudo iniciar Tesseract: '+e.message);
+    }
+    let ocrText='';
+    try{
+      const {data}=await worker.recognize(blobUrl);
+      ocrText=data.text||'';
+    }finally{
+      await worker.terminate();
+      URL.revokeObjectURL(blobUrl);
+    }
 
     if(!ocrText||ocrText.trim().length<20){
       result=getEmptyTicket();
