@@ -150,7 +150,7 @@ function gRB(file){
     const img=new Image();
     img.onload=()=>{
       URL.revokeObjectURL(url);
-      const MAX=1000;
+      const MAX=600;
       let w=img.naturalWidth,h=img.naturalHeight;
       if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
       else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
@@ -250,6 +250,12 @@ async function processFile(file){
     setOCRStatus('Optimizando imagen...');
     const b64=await gRB(file);
     const sizeKB=Math.round(b64.length*0.75/1024);
+    console.log('Imagen procesada:', sizeKB, 'KB', '| b64 chars:', b64.length);
+    if(sizeKB>800){
+      // Safari iOS tiene problemas con payloads muy grandes en fetch
+      // Recomprimir más agresivamente
+      showToast('Imagen grande ('+sizeKB+'KB), recomprimiendo...',2000);
+    }
     setOCRStatus('Analizando ticket con IA ('+sizeKB+' KB)...');
     const result=await geminiVision(b64);
     result.products=(result.products||[]).map(p=>applyKnowledgeToProduct(p));
@@ -521,7 +527,7 @@ function editSplit(i){
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <button class="btn-secondary" style="flex:1;font-size:13px" onclick="setQuickSplit(50)">50/50</button>
       <button class="btn-secondary" style="flex:1;font-size:13px" onclick="setQuickSplit(70)">70/30</button>
-      <button class="btn-secondary" style="flex:1;font-size:13px" onclick="setQuickSplit(100)">Todo p1</button>
+      <button class="btn-secondary" style="flex:1;font-size:13px" onclick="setQuickSplit(30)">30/70</button>
     </div>
     <button class="btn-primary" onclick="saveSplit(${i})">Aplicar</button>`);
 }
@@ -593,8 +599,8 @@ function renderManualExpenseSheet(){
         </div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(50)">50/50</button>
-          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(100)">Todo p1</button>
-          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(0)">Todo p2</button>
+          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(70)">70/30</button>
+          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="setMeQuickSplit(30)">30/70</button>
         </div>
       </div>
     </div>
