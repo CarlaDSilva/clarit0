@@ -176,7 +176,7 @@ function gRB(file){
   });
 }
 
-// ── GEMINI VISION ──────────────────────────────────────────────
+// ── GEMINI VISION — exactamente 1 petición ─────────────────────
 async function geminiVision(b64){
   const key=DB.apiKey;
   if(!key) throw new Error('Sin API key. Ve a Configuración.');
@@ -193,48 +193,42 @@ Normaliza nombres abreviados (SAL TO→Salsa tomate). Detecta descuentos. Confid
     ]}],
     generationConfig:{temperature:0.1,maxOutputTokens:2048}
   };
-  const models=['gemini-2.0-flash-lite','gemini-2.0-flash'];
-  for(const model of models){
-    const res=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
-    );
-    if(res.status===429){
-      // Single wait — don't loop, just tell user and open empty editor
-      throw new Error('Límite de la API gratuita alcanzado. Espera 1 minuto e inténtalo de nuevo.');
-    }
-    if(res.status===404) continue;
-    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
-    const data=await res.json();
-    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    try{return JSON.parse(clean);}
-    catch{
-      const m=clean.match(/\{[\s\S]*\}/);
-      if(m) return JSON.parse(m[0]);
-      throw new Error('La IA no devolvió JSON válido. Introduce el ticket manualmente.');
-    }
+
+  // 1 sola petición, 1 solo modelo, sin reintentos
+  const res=await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
+  );
+  if(res.status===429) throw new Error('Límite de API alcanzado. Espera 1 minuto e inténtalo de nuevo.');
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
+  const data=await res.json();
+  const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  try{return JSON.parse(clean);}
+  catch{
+    const m=clean.match(/\{[\s\S]*\}/);
+    if(m) return JSON.parse(m[0]);
+    throw new Error('La IA no devolvió JSON válido. Introduce el ticket manualmente.');
   }
-  throw new Error('No se pudo conectar con Gemini.');
 }
 
-// ── GEMINI TEXTO (chat asistente) ──────────────────────────────
+// ── GEMINI TEXTO — exactamente 1 petición ──────────────────────
 async function callGemini(prompt){
   const key=DB.apiKey;
   if(!key) throw new Error('No hay API key. Ve a Configuración.');
-  const body={contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:2048}};
-  const models=['gemini-2.0-flash-lite','gemini-2.0-flash'];
-  for(const model of models){
-    for(let attempt=0;attempt<2;attempt++){
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      if(res.status===429){await new Promise(r=>setTimeout(r,(attempt+1)*15000));continue;}
-      if(res.status===404) break;
-      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
-      const data=await res.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    }
-  }
-  throw new Error('No se pudo conectar con Gemini.');
+  const body={
+    contents:[{role:'user',parts:[{text:prompt}]}],
+    generationConfig:{temperature:0.2,maxOutputTokens:1024}
+  };
+  // 1 sola petición, sin reintentos, sin fallback de modelo
+  const res=await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
+  );
+  if(res.status===429) throw new Error('Límite de API alcanzado. Espera 1 minuto.');
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
+  const data=await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'';
 }
 
 // ── PROCESS FILE ───────────────────────────────────────────────
@@ -487,7 +481,7 @@ function renderProductRow(prod,i){
   }).join('');
 
   const pct=prod.pct1||50;
-  const pctLabel=isShared?pct+'%/'+(100-pct)+'%':'';
+  const pctLabel=isShared?'%':'';
 
   return`<div class="product-row" id="prod-${i}">
     <div class="product-top">
@@ -544,7 +538,7 @@ function saveTicket(){
   learnFromTicket(t);
   const idx=DB.tickets.findIndex(x=>x.id===t.id);
   if(idx>=0) DB.tickets[idx]=t; else DB.tickets.push(t);
-  saveDB();generateAIQuestions(t);
+  saveDB();
   closeTicketEditor();showToast('Ticket guardado ✓');showScreen(currentScreen==='tickets'?'tickets':'home');
 }
 function learnFromTicket(t){
