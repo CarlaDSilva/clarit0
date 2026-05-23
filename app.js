@@ -198,7 +198,10 @@ Normaliza nombres abreviados (SAL TO→Salsa tomate). Detecta descuentos. Confid
   const res=await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
-  );
+  ).catch(fetchErr=>{
+    console.error('Fetch bloqueado:', fetchErr.name, fetchErr.message);
+    throw new Error('Red bloqueada ('+fetchErr.name+'): comprueba WiFi, VPN o restricciones de Safari.');
+  });
   if(res.status===429) throw new Error('Límite de API alcanzado. Espera 1 minuto e inténtalo de nuevo.');
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
   const data=await res.json();
@@ -224,7 +227,10 @@ async function callGemini(prompt){
   const res=await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
-  );
+  ).catch(fetchErr=>{
+    console.error('Fetch bloqueado:', fetchErr.name, fetchErr.message);
+    throw new Error('Red bloqueada ('+fetchErr.name+')');
+  });
   if(res.status===429) throw new Error('Límite de API alcanzado. Espera 1 minuto.');
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
   const data=await res.json();
