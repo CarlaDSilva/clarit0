@@ -18,6 +18,7 @@ const PRESET_COLORS = [
 let DB = {
   apiKey:'',
   ocrKey:'helloworld',
+  visionKey:'',
   persons:[
     {id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},
     {id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}
@@ -32,6 +33,7 @@ function loadDB(){
   if(saved) DB=Object.assign({},DB,saved);
   DB.apiKey=S.get('apiKey')||DB.apiKey||'';
   DB.ocrKey=S.get('ocrKey')||DB.ocrKey||'helloworld';
+  DB.visionKey=S.get('visionKey')||DB.visionKey||'';
   if(!DB.knowledge) DB.knowledge={products:{},cards:{}};
   if(!DB.aiQuestions) DB.aiQuestions=[];
   if(!DB.aiConvMessages) DB.aiConvMessages=[];
@@ -104,10 +106,10 @@ function renderSetupStep(){
       </div>
       <p style="font-size:12px;color:var(--txt2);margin-bottom:8px">Obtén tu key en <strong style="color:var(--accent)">aistudio.google.com</strong> → Get API Key</p>
       <div class="field-row" style="margin-top:12px">
-        <label class="field-label">API Key de OCR.space <span style="color:var(--txt3)">(para leer tickets)</span></label>
-        <input type="password" id="s-ocrkey" placeholder="helloworld" value="${DB.ocrKey||'helloworld'}"/>
+        <label class="field-label">Google Cloud Vision Key <span style="color:var(--txt3)">(para leer tickets)</span></label>
+        <input type="password" id="s-ocrkey" placeholder="AIzaSy..." value="${DB.visionKey||''}"/>
       </div>
-      <p style="font-size:12px;color:var(--txt2);margin-bottom:20px">Key gratuita en <strong style="color:var(--accent)">ocr.space/ocrapi</strong> · Por ahora puedes dejar <em>helloworld</em></p>
+      <p style="font-size:12px;color:var(--txt2);margin-bottom:20px">Obtén tu key en <strong style="color:var(--accent)">console.cloud.google.com</strong> → APIs → Credenciales</p>
       <button class="btn-primary" onclick="setupNext0()">Continuar →</button>`;
   } else if(setupStep===1){
     html+=`
@@ -149,7 +151,7 @@ function setupNext0(){
   const ocrKey=document.getElementById('s-ocrkey').value.trim();
   if(!key){showToast('Introduce tu API key de Gemini');return;}
   DB.apiKey=key;S.set('apiKey',key);
-  DB.ocrKey=ocrKey||'helloworld';S.set('ocrKey',DB.ocrKey);
+  DB.visionKey=ocrKey||'';S.set('visionKey',DB.visionKey);
   setupStep=1;renderSetupStep();
 }
 function setupNext1(){setupStep=2;renderSetupStep();}
@@ -190,29 +192,27 @@ function resizeForOCR(file){
   });
 }
 
-// ── OCR.SPACE ──────────────────────────────────────────────────
-async function ocrSpaceExtract(b64){
-  const key=DB.ocrKey||'helloworld';
-  const formData=new FormData();
-  formData.append('base64Image','data:image/jpeg;base64,'+b64);
-  formData.append('language','spa');
-  formData.append('isOverlayRequired','false');
-  formData.append('detectOrientation','true');
-  formData.append('scale','true');
-  formData.append('OCREngine','2'); // Engine 2 es mejor para tickets
+// ── GOOGLE CLOUD VISION ────────────────────────────────────────
+async function googleVisionExtract(b64){
+  const key=DB.visionKey;
+  if(!key) throw new Error('Sin Google Vision API key. Configúrala en Ajustes.');
 
-  const res=await fetch('https://api.ocr.space/parse/image',{
-    method:'POST',
-    headers:{'apikey':key},
-    body:formData
-  });
+  const body={
+    requests:[{
+      image:{content:b64},
+      features:[{type:'DOCUMENT_TEXT_DETECTION',maxResults:1}]
+    }]
+  };
 
-  if(!res.ok) throw new Error('OCR.space HTTP '+res.status);
+  const res=await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${key}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
+  );
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'Vision HTTP '+res.status);}
   const data=await res.json();
-  if(data.IsErroredOnProcessing) throw new Error(data.ErrorMessage?.[0]||'Error OCR');
-  const text=(data.ParsedResults||[]).map(r=>r.ParsedText||'').join('\n');
+  const text=data.responses?.[0]?.fullTextAnnotation?.text||'';
   if(!text.trim()) throw new Error('No se detectó texto en la imagen');
-  console.log('OCR texto extraído:', text.slice(0,300));
+  console.log('Vision texto extraído:', text.slice(0,400));
   return text;
 }
 
@@ -427,11 +427,11 @@ async function processFile(file){
     // ── PASO 1: OCR.space extrae texto ──
     let ocrText='';
     try{
-      setOCRStatus('Leyendo texto del ticket (OCR)...');
-      ocrText=await ocrSpaceExtract(b64);
+      setOCRStatus('Leyendo ticket con Google Vision...');
+      ocrText=await googleVisionExtract(b64);
     }catch(ocrErr){
-      console.warn('OCR.space falló:', ocrErr.message);
-      setOCRStatus('OCR falló, usando IA directamente...');
+      console.warn('Google Vision falló:', ocrErr.message);
+      setOCRStatus('Vision falló...');
     }
 
     let result;
@@ -933,7 +933,7 @@ function renderSettings(){
       <div class="settings-section-title">APIs</div>
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="editApiKey()"><div class="settings-icon" style="background:#374151"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div class="settings-label">Gemini API Key</div><div class="settings-value">${DB.apiKey?'•••'+DB.apiKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
-        <div class="settings-row" onclick="editOcrKey()"><div class="settings-icon" style="background:#1a3a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h3M7 12h3M7 16h3M14 8h3M14 12h3M14 16h3"/></svg></div><div class="settings-label">OCR.space Key</div><div class="settings-value">${DB.ocrKey&&DB.ocrKey!=='helloworld'?'•••'+DB.ocrKey.slice(-4):'Demo (helloworld)'}</div><div class="settings-arrow">›</div></div>
+        <div class="settings-row" onclick="editVisionKey()"><div class="settings-icon" style="background:#1a3a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h3M7 12h3M7 16h3M14 8h3M14 12h3M14 16h3"/></svg></div><div class="settings-label">Google Vision Key</div><div class="settings-value">${DB.visionKey?'•••'+DB.visionKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
       </div>
     </div>
     <div class="settings-section">
@@ -979,6 +979,7 @@ function savePerson(idx){const n=document.getElementById('ep-name').value.trim()
 function forgetCard(l4){delete DB.knowledge.cards[l4];saveDB();renderSettings();}
 function clearKnowledge(){openModal(`<div class="modal-title">¿Borrar conocimiento?</div><p style="font-size:14px;color:var(--txt1);margin-bottom:20px">Se eliminan los productos aprendidos. Los tickets se conservan.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="DB.knowledge.products={};saveDB();closeModal();renderSettings();showToast('Borrado')">Borrar</button></div>`);}
 function editApiKey(){openModal(`<div class="modal-title">API Key de Gemini</div><p style="font-size:13px;color:var(--txt2);margin-bottom:12px">Obtén tu key gratuita en aistudio.google.com</p><input type="password" id="new-apikey" value="${DB.apiKey||''}" placeholder="AIza..."/><div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-primary" style="flex:2" onclick="const k=document.getElementById('new-apikey').value.trim();if(!k)return;DB.apiKey=k;S.set('apiKey',k);saveDB();closeModal();showToast('Guardada ✓');renderSettings()">Guardar</button></div>`);}
+function editVisionKey(){openModal(`<div class="modal-title">Google Cloud Vision Key</div><p style="font-size:13px;color:var(--txt2);margin-bottom:12px">Obtén tu key en <strong style="color:var(--accent)">console.cloud.google.com</strong> → APIs y servicios → Credenciales</p><input type="password" id="new-visionkey" value="${DB.visionKey||''}" placeholder="AIzaSy..."/><div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-primary" style="flex:2" onclick="const k=document.getElementById('new-visionkey').value.trim();if(!k)return;DB.visionKey=k;S.set('visionKey',k);saveDB();closeModal();showToast('Guardada ✓');renderSettings()">Guardar</button></div>\`);}
 function editOcrKey(){openModal(`<div class="modal-title">API Key de OCR.space</div><p style="font-size:13px;color:var(--txt2);margin-bottom:4px">Key gratuita en <strong style="color:var(--accent)">ocr.space/ocrapi</strong></p><p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Deja <em>helloworld</em> para usar la key demo (limitada)</p><input type="password" id="new-ocrkey" value="${DB.ocrKey||'helloworld'}" placeholder="helloworld"/><div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-primary" style="flex:2" onclick="const k=document.getElementById('new-ocrkey').value.trim()||'helloworld';DB.ocrKey=k;S.set('ocrKey',k);saveDB();closeModal();showToast('Guardada ✓');renderSettings()">Guardar</button></div>`);}
 function exportData(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='clarito-'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 function resetAll(){openModal(`<div class="modal-title">⚠️ ¿Borrar todo?</div><p style="font-size:14px;color:var(--txt1);margin-bottom:20px">No se puede deshacer.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="localStorage.clear();location.reload()">Borrar todo</button></div>`);}
@@ -1050,7 +1051,7 @@ loadDB();
 setTimeout(()=>{
   hideSplash();
   setTimeout(()=>{
-    if(!DB.apiKey&&DB.ocrKey==='helloworld'){
+    if(!DB.visionKey){
       startSetup();
     }else{
       document.getElementById('app').style.display='flex';
