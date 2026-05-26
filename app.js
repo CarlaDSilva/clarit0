@@ -32,7 +32,7 @@ let DB = {
   ],
   tickets:[],expenses:[],settlements:[],
   knowledge:{products:{},cards:{}},
-  aiQuestions:[],aiConvMessages:[]
+  aiQuestions:[],aiConvMessages:[],lightMode:false
 };
 
 function loadDB(){
@@ -42,6 +42,7 @@ function loadDB(){
   DB.ocrKey=S.get('ocrKey')||DB.ocrKey||'helloworld';
   DB.visionKey=S.get('visionKey')||DB.visionKey||'';
   DB.groqKey=S.get('groqKey')||DB.groqKey||'';
+  DB.lightMode=S.get('lightMode')||DB.lightMode||false;
   if(!DB.knowledge) DB.knowledge={products:{},cards:{}};
   if(!DB.aiQuestions) DB.aiQuestions=[];
   if(!DB.aiConvMessages) DB.aiConvMessages=[];
@@ -563,19 +564,29 @@ async function processFile(file){
 }
 
 function applyKnowledgeToProduct(prod){
-  const key=normalizeKey(prod.name||prod.rawName||'');
-  const known=DB.knowledge.products[key];
-  // Buscar también por rawName
-  const ocrKey=normalizeKey((prod.rawName||'').trim());
-  const knownByRaw=ocrKey&&ocrKey!==key?DB.knowledge.products[ocrKey]:null;
-  const match=known||knownByRaw;
+  const rawNorm=normalizeKey(prod.rawName||'');
+  const nameNorm=normalizeKey(prod.name||'');
+
+  // Search by: normalized name, normalized rawName, or alias match
+  let match=DB.knowledge.products[nameNorm]||DB.knowledge.products[rawNorm];
+
+  // Also search by alias: find any entry whose alias matches this product name/raw
+  if(!match){
+    match=Object.values(DB.knowledge.products).find(v=>
+      v.alias&&(normalizeKey(v.alias)===nameNorm||normalizeKey(v.alias)===rawNorm)
+    );
+  }
+  // Also search by ocr_raw array
+  if(!match){
+    const rawUpper=(prod.rawName||'').trim().toUpperCase();
+    if(rawUpper) match=Object.values(DB.knowledge.products).find(v=>v.ocr_raw?.includes(rawUpper));
+  }
 
   if(match){
     prod.assignedTo=match.shared?null:match.person;
-    prod.shared=match.shared;
+    prod.shared=!!match.shared;
     prod.pct1=match.pct1||50;
     prod.knownMatch=true;
-    // Aplicar alias si existe y es distinto al nombre actual
     if(match.alias&&match.alias!==prod.name) prod.name=match.alias;
   } else {
     prod.assignedTo=null;prod.shared=true;prod.pct1=50;
@@ -600,9 +611,9 @@ function renderHome(){
   const recent=[...DB.tickets,...DB.expenses].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
   document.getElementById('view').innerHTML=`
     <div class="screen-header">
-      <div style="display:flex;align-items:center;gap:10px">
-        <img src="icon.png" style="width:28px;height:28px;border-radius:8px;object-fit:cover;filter:invert(1)" onerror="this.style.display='none'"/>
-        <div><h1>Clarito</h1><p>La contabilidad doméstica casi invisible</p></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1)" onerror="this.style.display='none'"/>
+        <h1>Clarito</h1>
       </div>
     </div>
     <div class="balance-hero">
@@ -1011,7 +1022,9 @@ function renderStats(){
   const now=new Date();
   const thisMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const allT=DB.tickets.filter(t=>t.confirmed);
-  const monthT=allT.filter(t=>t.date&&t.date.startsWith(thisMonth));
+  const monthStart=thisMonth+'-01';
+  const monthEnd=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().slice(0,10);
+  const monthT=allT.filter(t=>t.date&&t.date>=monthStart&&t.date<=monthEnd);
   const monthTotal=monthT.reduce((s,t)=>s+(parseFloat(t.total)||0),0);
 
   // Gasto real por persona este mes (parte proporcional de comunes + los suyos)
@@ -1031,7 +1044,7 @@ function renderStats(){
       }
     });
   });
-  DB.expenses.filter(e=>e.confirmed&&e.date&&e.date.startsWith(thisMonth)).forEach(e=>{
+  DB.expenses.filter(e=>e.confirmed&&e.date&&e.date>=monthStart&&e.date<=monthEnd).forEach(e=>{
     const amt=parseFloat(e.total||0);
     DB.persons.forEach((p,i)=>{
       const pct=i===0?e.split1:100-e.split1;
@@ -1064,7 +1077,7 @@ function renderStats(){
   document.getElementById('view').innerHTML=`
     <div class="screen-header"><h1>Estadísticas</h1><p>Análisis del hogar</p></div>
 
-    <div class="stats-grid">
+    <div class="stats-grid" style="margin-top:16px">
       <div class="stat-card"><div class="stat-label">Este mes total</div><div class="stat-value">${fmt(monthTotal)}</div></div>
       <div class="stat-card"><div class="stat-label">Tickets totales</div><div class="stat-value">${allT.length}</div></div>
     </div>
@@ -1113,7 +1126,7 @@ function getPredictions(){
 // ── SETTINGS ───────────────────────────────────────────────────
 function renderSettings(){
   document.getElementById('view').innerHTML=`
-    <div class="screen-header"><div style="display:flex;align-items:center;gap:10px"><img src="icon.png" style="width:28px;height:28px;border-radius:8px" onerror="this.style.display='none'"/><h1>Configuración</h1></div></div>
+    <div class="screen-header"><div style="display:flex;align-items:center;gap:12px"><img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1)" onerror="this.style.display='none'"/><h1>Configuración</h1></div></div>
     <div class="settings-section">
       <div class="settings-section-title">Personas (${DB.persons.length})</div>
       <div style="background:var(--bg1)">
@@ -1126,6 +1139,7 @@ function renderSettings(){
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="editApiKey()"><div class="settings-icon" style="background:#374151"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div class="settings-label">Gemini API Key</div><div class="settings-value">${DB.apiKey?'•••'+DB.apiKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
         <div class="settings-row" onclick="editVisionKey()"><div class="settings-icon" style="background:#1a3a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h3M7 12h3M7 16h3M14 8h3M14 12h3M14 16h3"/></svg></div><div class="settings-label">Google Vision Key</div><div class="settings-value">${DB.visionKey?'•••'+DB.visionKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
+        <div class="settings-row" onclick="toggleLightMode()"><div class="settings-icon" style="background:#333"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></div><div class="settings-label">Modo claro</div><div class="settings-value">${DB.lightMode?'Activado':'Desactivado'}</div><div class="settings-arrow">›</div></div>
         <div class="settings-row" onclick="editGroqKey()"><div class="settings-icon" style="background:#2a1a3a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="settings-label">Groq Key (chat IA)</div><div class="settings-value">${DB.groqKey?'•••'+DB.groqKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
       </div>
     </div>
@@ -1148,6 +1162,40 @@ function renderSettings(){
     </div>
     <p style="text-align:center;font-size:11px;color:var(--txt3);padding:20px">Clarito · Datos guardados localmente.</p>`;
 }
+function toggleLightMode(){
+  DB.lightMode=!DB.lightMode;
+  S.set('lightMode',DB.lightMode);
+  saveDB();
+  applyTheme();
+  renderSettings();
+}
+function applyTheme(){
+  const r=document.documentElement;
+  if(DB.lightMode){
+    r.style.setProperty('--bg0','#f0f0f2');
+    r.style.setProperty('--bg1','#e8e8ec');
+    r.style.setProperty('--bg2','#dcdce4');
+    r.style.setProperty('--bg3','#d0d0da');
+    r.style.setProperty('--bg4','#c4c4ce');
+    r.style.setProperty('--txt0','#1a1a22');
+    r.style.setProperty('--txt1','#3a3a48');
+    r.style.setProperty('--txt2','#6a6a78');
+    r.style.setProperty('--txt3','#9a9aa8');
+    r.style.setProperty('--brd','#c8c8d4');
+  } else {
+    r.style.setProperty('--bg0','#0d0d0f');
+    r.style.setProperty('--bg1','#141417');
+    r.style.setProperty('--bg2','#1c1c21');
+    r.style.setProperty('--bg3','#242429');
+    r.style.setProperty('--bg4','#2e2e35');
+    r.style.setProperty('--txt0','#f0f0f2');
+    r.style.setProperty('--txt1','#b8b8c2');
+    r.style.setProperty('--txt2','#737380');
+    r.style.setProperty('--txt3','#45454f');
+    r.style.setProperty('--brd','#2a2a32');
+  }
+}
+
 function editKnowledgeProducts(){
   const prods=Object.entries(DB.knowledge.products).sort((a,b)=>a[0].localeCompare(b[0]));
   if(!prods.length){showToast('No hay productos aprendidos todavía');return;}
@@ -1267,7 +1315,7 @@ async function sendAIMessage(){
       else DB.persons.forEach(p=>{const pct=p.id===DB.persons[0].id?(prod.pct1||50):100-(prod.pct1||50);monthByPerson[p.id]=(monthByPerson[p.id]||0)+price*pct/100;});
     });
   });
-  DB.expenses.filter(e=>e.confirmed&&e.date&&e.date.startsWith(thisMonth)).forEach(e=>{
+  DB.expenses.filter(e=>e.confirmed&&e.date&&e.date>=monthStart&&e.date<=monthEnd).forEach(e=>{
     const amt=parseFloat(e.total||0);
     DB.persons.forEach((p,i)=>{const pct=i===0?e.split1:100-e.split1;monthByPerson[p.id]=(monthByPerson[p.id]||0)+amt*(pct||50)/100;});
   });
@@ -1312,6 +1360,7 @@ function generateAIQuestions(ticket){
 
 // ── BOOT ──────────────────────────────────────────────────────
 loadDB();
+applyTheme();
 setTimeout(()=>{
   hideSplash();
   setTimeout(()=>{
@@ -1324,3 +1373,18 @@ setTimeout(()=>{
     }
   },100);
 },2500);
+
+// ── RESPONSIVE: tablet/desktop handled via CSS injection ──
+// This is appended once on load
+(function injectResponsiveCSS(){
+  const style=document.createElement('style');
+  style.textContent=`
+    @media(min-width:600px){
+      #app,#nav{max-width:480px!important;}
+      #setup-screen .setup-step{max-width:420px;}
+      body{display:flex;justify-content:center;background:#000;}
+      #app{border-left:1px solid #222;border-right:1px solid #222;box-shadow:0 0 60px rgba(0,0,0,.8);}
+    }
+  `;
+  document.head.appendChild(style);
+})();
