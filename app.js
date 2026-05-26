@@ -1208,7 +1208,7 @@ function generateAIQuestions(ticket){
   if(qs.length){DB.aiQuestions.push(...qs);saveDB();updateAIBadge();}
 }
 
-// ── BOOT ──────────────────────────────────────────────────────
+// ── BOOT ──────────────────────────────────────────────────────-
 loadDB();
 setTimeout(()=>{
   hideSplash();
