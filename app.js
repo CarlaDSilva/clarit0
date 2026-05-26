@@ -278,6 +278,16 @@ function parseTicketText(text){
   const PRICE_ONLY_RX=/^\s*(\d{1,3}[.,]\d{2})\s*€?\s*$/; // línea que es solo un precio
   const INLINE_PRICE_RX=/^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*€?\s*$/; // nombre  precio en misma línea
   const QTY_PREFIX_RX=/^(\d+)\s+(.+)/; // "2 SALMOREJO FRESCO"
+  const KG_LINE_RX=/\d+[.,]\d+\s*kg|\d+[.,]\d+\s*x\s*\d+[.,]\d+|€\/kg|eur\/kg/i; // línea de kilos o precio/kg
+
+  // Limpia el nombre de la parte de kg/precio que a veces viene pegada
+  function cleanProductName(raw){
+    return raw
+      .replace(/\d+[.,]\d+\s*kg.*/i,'')   // quita "0,454 kg x ..."
+      .replace(/\s*€\/kg.*/i,'')            // quita "€/kg ..."
+      .replace(/\s*€\/u.*/i,'')             // quita "€/u ..."
+      .trim();
+  }
 
   const products=[];
   let i=0;
@@ -287,43 +297,36 @@ function parseTicketText(text){
 
     if(SKIP_RX.test(line.trim())) continue;
     if(line.trim().length<3) continue;
+    if(line.includes('%')) continue; // omitir líneas con porcentaje (IVA, descuentos %)
+    if(KG_LINE_RX.test(line)) continue; // omitir líneas que son solo info de kg/precio unitario
 
     // Formato inline: NOMBRE    1,45
     const inlineM=line.match(INLINE_PRICE_RX);
     if(inlineM){
       const rawName=inlineM[1].trim();
       const price=parseFloat(inlineM[2].replace(',','.'));
-      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)){
+      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)&&!rawName.includes('%')){
         const qm=rawName.match(QTY_PREFIX_RX);
         const qty=qm?parseInt(qm[1]):1;
-        const name=qm?qm[2]:rawName;
-        products.push(makeProduct(name,rawName,price,qty));
+        const name=cleanProductName(qm?qm[2]:rawName);
+        if(name.length>=2) products.push(makeProduct(name,rawName,price,qty));
       }
       continue;
     }
 
-    // Formato Mercadona: línea con nombre, siguiente línea con precio total
-    // "2 SALMOREJO FRESCO\n1,25\n2,50"  → precio total es el segundo (2,50)
-    // "1 TORTILLA\n4,50" → precio es el primero
+    // Formato Mercadona: nombre en una línea, precios en líneas siguientes
     const isProductLine=!PRICE_ONLY_RX.test(line)&&line.trim().length>=3&&!/^\d{1,2}\/\d{2}\/\d{2,4}/.test(line);
     if(isProductLine){
-      // Recoge precios en líneas siguientes (mientras sean solo precio)
       const priceLines=[];
       while(i<lines.length&&PRICE_ONLY_RX.test(lines[i])){
         priceLines.push({val:parseFloat(lines[i].replace(',','.')), raw:lines[i]});
         i++;
       }
       if(priceLines.length>0){
-        // Detectar patrón fruta/verdura: "0,454 kg x 1,99 €/kg" → ignorar precio/kg, usar el total
-        // Si hay 3 precios: [kg_amount, price_per_kg, total] → usar el último (total)
-        // Si hay 2 precios y el primero es <1 (kilos): [kilos, precio_unit] o [unit_price, total]
-        // Regla simple: el precio total es SIEMPRE el mayor entre los que no parecen kg (>0.1)
         let price;
         if(priceLines.length>=3){
-          // Tres líneas: probablemente kilos, €/kg, total → el último es el total
-          price=priceLines[priceLines.length-1].val;
+          price=priceLines[priceLines.length-1].val; // el último es el total
         } else if(priceLines.length===2){
-          // Dos líneas: precio unit y total, o kilos y precio → el mayor es el total
           price=Math.max(priceLines[0].val, priceLines[1].val);
         } else {
           price=priceLines[0].val;
@@ -331,10 +334,11 @@ function parseTicketText(text){
 
         const rawName=line.trim();
         if(SKIP_RX.test(rawName)) continue;
+        if(rawName.includes('%')) continue;
         if(rawName.length<2) continue;
         const qm=rawName.match(QTY_PREFIX_RX);
         const qty=qm?parseInt(qm[1]):1;
-        const name=qm?qm[2]:rawName;
+        const name=cleanProductName(qm?qm[2]:rawName);
         if(!/^\d+$/.test(name)&&name.length>=2)
           products.push(makeProduct(name,rawName,price,qty));
       }
