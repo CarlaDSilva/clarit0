@@ -416,36 +416,6 @@ function guessCategory(name){
 
 // ── GEMINI FALLBACK (texto) ─────────────────────────────────────
 // Solo se usa si OCR.space falla O si el parser saca <2 productos
-async function geminiParseText(ocrText){
-  const key=DB.apiKey;
-  if(!key) throw new Error('Sin API key Gemini');
-
-  const knownProds=Object.entries(DB.knowledge.products).slice(0,8)
-    .map(([k,v])=>`${k}→${v.shared?'común':personName(v.person)}`).join(', ');
-
-  const prompt=`Analiza este texto extraído de un ticket de supermercado español. Devuelve SOLO JSON sin markdown:
-{"store":"","date":"YYYY-MM-DD o null","total":0,"last4":"4 dígitos o null","products":[{"rawName":"texto literal","name":"nombre normalizado","price":0,"discount":0,"qty":1,"confidence":0.9,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|congelados|otro"}],"errors":[],"warnings":[]}
-Texto del ticket:
-${ocrText}
-${knownProds?' Productos conocidos: '+knownProds:''}`;
-
-  const body={
-    contents:[{role:'user',parts:[{text:prompt}]}],
-    generationConfig:{temperature:0.1,maxOutputTokens:2048}
-  };
-
-  const res=await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
-  );
-  if(res.status===429) throw new Error('Límite Gemini. Espera 1 minuto.');
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
-  const data=await res.json();
-  const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-  const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-  try{return JSON.parse(clean);}
-  catch{const m=clean.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('JSON inválido de Gemini');}
-}
 
 // ── GROQ (chat IA + fallback parser) ──────────────────────────
 async function callGroq(prompt){
@@ -1208,7 +1178,7 @@ function generateAIQuestions(ticket){
   if(qs.length){DB.aiQuestions.push(...qs);saveDB();updateAIBadge();}
 }
 
-// ── BOOT ──────────────────────────────────────────────────────-
+// ── BOOT ──────────────────────────────────────────────────────
 loadDB();
 setTimeout(()=>{
   hideSplash();
