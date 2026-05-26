@@ -232,60 +232,73 @@ function parseTicketText(text){
     if(!store&&l.length>3&&l.length<30&&/^[A-ZÁÉÍÓÚÑ\s]+$/.test(l)) store=l;
   }
 
-  // ── Detectar fecha ──
-  let date=null;
+  // ── Detectar fecha y hora ──
+  let date=null,time=null;
   const dateRx=[
     /(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{2,4})/,
     /(\d{1,2})\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\w*\s+(\d{2,4})/i
   ];
+  const timeRx=/(\d{1,2}):(\d{2})(?::\d{2})?/;
   for(const l of lines){
-    for(const rx of dateRx){
-      const m=l.match(rx);
-      if(m){
-        try{
-          let [,a,b,c]=m;
-          if(c&&c.length===2) c='20'+c;
-          const d=new Date(`${c}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`);
-          if(!isNaN(d)){date=d.toISOString().slice(0,10);break;}
-        }catch{}
+    if(!date){
+      for(const rx of dateRx){
+        const m=l.match(rx);
+        if(m){
+          try{
+            let [,a,b,c]=m;
+            if(c&&c.length===2) c='20'+c;
+            const d=new Date(`${c}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`);
+            if(!isNaN(d)){date=d.toISOString().slice(0,10);}
+          }catch{}
+        }
       }
     }
-    if(date) break;
+    if(!time){
+      const tm=l.match(timeRx);
+      if(tm) time=`${tm[1].padStart(2,'0')}:${tm[2]}`;
+    }
+    if(date&&time) break;
   }
 
-  // ── Detectar total ──
+  // ── Detectar total — solo busca línea con "TOTAL" explícito, no "entrega efectivo" ──
   let total=0;
-  const totalRx=/(?:total|importe|a\s*pagar|sum)[^\d]*(\d+[.,]\d{2})/i;
+  const totalRx=/^(?:total|importe\s*total|a\s*pagar)[^\d]*(\d+[.,]\d{2})/i;
+  // Buscar primero línea exacta de total
   for(const l of [...lines].reverse()){
     const m=l.match(totalRx);
     if(m){total=parseFloat(m[1].replace(',','.'));break;}
   }
-  // Fallback: mayor precio encontrado
+  // Fallback: buscar "TOTAL (€)" con precio en línea siguiente
   if(!total){
-    const prices=lines.map(l=>{const m=l.match(/(\d+)[,.](\d{2})\s*€?$/);return m?parseFloat(m[1]+'.'+m[2]):0;});
-    total=Math.max(...prices,0);
+    for(let i=0;i<lines.length;i++){
+      if(/^total\s*[\(\€]?/i.test(lines[i])&&i+1<lines.length){
+        const m=lines[i+1].match(/(\d+[.,]\d{2})/);
+        if(m){total=parseFloat(m[1].replace(',','.'));break;}
+        const m2=lines[i].match(/(\d+[.,]\d{2})/);
+        if(m2){total=parseFloat(m2[1].replace(',','.'));break;}
+      }
+    }
   }
 
   // ── Detectar últimos 4 dígitos tarjeta ──
   let last4=null;
   for(const l of lines){
-    const m=l.match(/[*xX•]{4,}\s*(\d{4})/)||l.match(/tarjeta[^\d]*(\d{4})/i)||l.match(/VISA[^\d]*(\d{4})/i);
+    const m=l.match(/[*xX•]{4,}\s*(\d{4})/)||l.match(/tarjeta[^\d]*(\d{4})/i)||l.match(/VISA[^\d]*(\d{4})/i)||l.match(/MASTERCARD[^\d]*(\d{4})/i);
     if(m){last4=m[1];break;}
   }
 
   // ── Detectar productos ──
-  const SKIP_RX=/^(total|subtotal|iva|importe|a pagar|tarjeta|visa|mastercard|cambio|efectivo|gracias|ticket|fecha|hora|caja|operador|factura|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.|entrega|op:|telef)/i;
-  const PRICE_ONLY_RX=/^\s*(\d{1,3}[.,]\d{2})\s*€?\s*$/; // línea que es solo un precio
-  const INLINE_PRICE_RX=/^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*€?\s*$/; // nombre  precio en misma línea
-  const QTY_PREFIX_RX=/^(\d+)\s+(.+)/; // "2 SALMOREJO FRESCO"
-  const KG_LINE_RX=/\d+[.,]\d+\s*kg|\d+[.,]\d+\s*x\s*\d+[.,]\d+|€\/kg|eur\/kg/i; // línea de kilos o precio/kg
+  const SKIP_RX=/^(total|subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[eé]f|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale)/i;
+  const PRICE_ONLY_RX=/^\s*(\d{1,3}[.,]\d{2})\s*€?\s*$/;
+  const INLINE_PRICE_RX=/^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*€?\s*$/;
+  const QTY_PREFIX_RX=/^(\d+)\s+(.+)/;
+  const KG_LINE_RX=/\d+[.,]\d+\s*kg|\d+[.,]\d+\s*x\s*\d+[.,]\d+|€\/kg|eur\/kg|\d+[.,]\d{3}\s/i;
 
-  // Limpia el nombre de la parte de kg/precio que a veces viene pegada
   function cleanProductName(raw){
     return raw
-      .replace(/\d+[.,]\d+\s*kg.*/i,'')   // quita "0,454 kg x ..."
-      .replace(/\s*€\/kg.*/i,'')            // quita "€/kg ..."
-      .replace(/\s*€\/u.*/i,'')             // quita "€/u ..."
+      .replace(/\d+[.,]\d+\s*kg.*/i,'')
+      .replace(/\s*€\/kg.*/i,'')
+      .replace(/\s*€\/u.*/i,'')
       .trim();
   }
 
@@ -297,25 +310,26 @@ function parseTicketText(text){
 
     if(SKIP_RX.test(line.trim())) continue;
     if(line.trim().length<3) continue;
-    if(line.includes('%')) continue; // omitir líneas con porcentaje (IVA, descuentos %)
-    if(KG_LINE_RX.test(line)) continue; // omitir líneas que son solo info de kg/precio unitario
+    if(line.includes('%')) continue;
+    if(KG_LINE_RX.test(line)) continue;
 
     // Formato inline: NOMBRE    1,45
     const inlineM=line.match(INLINE_PRICE_RX);
     if(inlineM){
       const rawName=inlineM[1].trim();
       const price=parseFloat(inlineM[2].replace(',','.'));
-      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)&&!rawName.includes('%')){
+      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)&&!rawName.includes('%')&&!SKIP_RX.test(rawName)){
         const qm=rawName.match(QTY_PREFIX_RX);
         const qty=qm?parseInt(qm[1]):1;
         const name=cleanProductName(qm?qm[2]:rawName);
-        if(name.length>=2) products.push(makeProduct(name,rawName,price,qty));
+        const unitPrice=qty>1?parseFloat((price/qty).toFixed(2)):price;
+        if(name.length>=2) products.push(makeProduct(name,rawName,unitPrice,qty));
       }
       continue;
     }
 
     // Formato Mercadona: nombre en una línea, precios en líneas siguientes
-    const isProductLine=!PRICE_ONLY_RX.test(line)&&line.trim().length>=3&&!/^\d{1,2}\/\d{2}\/\d{2,4}/.test(line);
+    const isProductLine=!PRICE_ONLY_RX.test(line)&&line.trim().length>=3&&!/^\d{1,2}\/\d{2}\/\d{2,4}/.test(line)&&!/^\d{1,2}:\d{2}/.test(line);
     if(isProductLine){
       const priceLines=[];
       while(i<lines.length&&PRICE_ONLY_RX.test(lines[i])){
@@ -325,7 +339,7 @@ function parseTicketText(text){
       if(priceLines.length>0){
         let price;
         if(priceLines.length>=3){
-          price=priceLines[priceLines.length-1].val; // el último es el total
+          price=priceLines[priceLines.length-1].val;
         } else if(priceLines.length===2){
           price=Math.max(priceLines[0].val, priceLines[1].val);
         } else {
@@ -338,14 +352,15 @@ function parseTicketText(text){
         if(rawName.length<2) continue;
         const qm=rawName.match(QTY_PREFIX_RX);
         const qty=qm?parseInt(qm[1]):1;
+        const unitPrice=qty>1?parseFloat((price/qty).toFixed(2)):price;
         const name=cleanProductName(qm?qm[2]:rawName);
         if(!/^\d+$/.test(name)&&name.length>=2)
-          products.push(makeProduct(name,rawName,price,qty));
+          products.push(makeProduct(name,rawName,unitPrice,qty));
       }
     }
   }
 
-  return{store,date,total,last4,products,errors:[],warnings:[]};
+  return{store,date,time,last4,total,products,errors:[],warnings:[]};
 }
 
 function makeProduct(name,rawName,price,qty=1){
@@ -535,12 +550,20 @@ async function processFile(file){
 function applyKnowledgeToProduct(prod){
   const key=normalizeKey(prod.name||prod.rawName||'');
   const known=DB.knowledge.products[key];
-  if(known){prod.assignedTo=known.shared?null:known.person;prod.shared=known.shared;prod.pct1=known.pct1||50;prod.knownMatch=true;}
-  else{
-    const ocrKey=(prod.rawName||'').trim().toUpperCase();
-    const ocrMatch=Object.values(DB.knowledge.products).find(v=>v.ocr_raw?.includes(ocrKey));
-    if(ocrMatch){prod.assignedTo=ocrMatch.shared?null:ocrMatch.person;prod.shared=ocrMatch.shared;prod.pct1=ocrMatch.pct1||50;prod.knownMatch=true;}
-    else{prod.assignedTo=null;prod.shared=true;prod.pct1=50;}
+  // Buscar también por rawName
+  const ocrKey=normalizeKey((prod.rawName||'').trim());
+  const knownByRaw=ocrKey&&ocrKey!==key?DB.knowledge.products[ocrKey]:null;
+  const match=known||knownByRaw;
+
+  if(match){
+    prod.assignedTo=match.shared?null:match.person;
+    prod.shared=match.shared;
+    prod.pct1=match.pct1||50;
+    prod.knownMatch=true;
+    // Aplicar alias si existe y es distinto al nombre actual
+    if(match.alias&&match.alias!==prod.name) prod.name=match.alias;
+  } else {
+    prod.assignedTo=null;prod.shared=true;prod.pct1=50;
   }
   prod.finalPrice=prod.finalPrice??prod.price;
   return prod;
@@ -703,7 +726,10 @@ function renderTicketEditor(){
         <div class="te-section-title">Información</div>
         <div class="card" style="margin:0 0 12px">
           <div class="field-row"><label class="field-label">Supermercado</label><input value="${t.store||''}" placeholder="Ej: Mercadona" oninput="currentTicket.store=this.value"/></div>
-          <div class="field-row" style="margin-top:10px"><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" onchange="currentTicket.date=this.value"/></div>
+          <div style="display:flex;gap:10px;margin-top:10px">
+            <div style="flex:2"><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" onchange="currentTicket.date=this.value"/></div>
+            <div style="flex:1"><label class="field-label">Hora</label><input type="time" value="${t.time||''}" onchange="currentTicket.time=this.value" placeholder="14:09"/></div>
+          </div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Últimos 4 dígitos tarjeta</label><input value="${t.last4||''}" placeholder="4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:600"/></div>
         </div>
@@ -815,7 +841,6 @@ function saveTicket(){
 function learnFromTicket(t){
   if(t.last4&&t.payer){
     DB.knowledge.cards[t.last4]=t.payer;
-    // También añadir a la lista de tarjetas de la persona si no está ya
     const person=personById(t.payer);
     if(person){
       if(!person.cards) person.cards=[];
@@ -826,7 +851,29 @@ function learnFromTicket(t){
     const key=normalizeKey(prod.name||'');if(!key) return;
     const ocrRaw=(prod.rawName||'').trim().toUpperCase();
     const ex=DB.knowledge.products[key]||{count:0,ocr_raw:[]};
-    DB.knowledge.products[key]={person:prod.assignedTo||null,shared:!prod.assignedTo,pct1:prod.pct1||50,count:(ex.count||0)+1,category:prod.category,ocr_raw:ocrRaw&&!ex.ocr_raw.includes(ocrRaw)?[...ex.ocr_raw,ocrRaw]:ex.ocr_raw};
+    DB.knowledge.products[key]={
+      person:prod.assignedTo||null,
+      shared:!prod.assignedTo,
+      pct1:prod.pct1||50,
+      count:(ex.count||0)+1,
+      category:prod.category,
+      alias:prod.name, // nombre personalizado que el usuario ha editado
+      ocr_raw:ocrRaw&&!(ex.ocr_raw||[]).includes(ocrRaw)?[...(ex.ocr_raw||[]),ocrRaw]:(ex.ocr_raw||[])
+    };
+    // Si el rawName es distinto al nombre normalizado, guardar también alias por rawName
+    if(ocrRaw&&prod.name){
+      const rawKey=normalizeKey(ocrRaw);
+      if(rawKey&&rawKey!==key){
+        DB.knowledge.products[rawKey]={
+          ...(DB.knowledge.products[rawKey]||{}),
+          alias:prod.name,
+          person:prod.assignedTo||null,
+          shared:!prod.assignedTo,
+          pct1:prod.pct1||50,
+          ocr_raw:[ocrRaw]
+        };
+      }
+    }
   });
 }
 function closeTicketEditor(){document.getElementById('ticket-editor').style.display='none';currentTicket=null;}
