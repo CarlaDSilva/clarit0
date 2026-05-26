@@ -2,7 +2,7 @@
 //  CLARITO — app.js
 // ═══════════════════════════════════════════════════════════════
 
-// ── STORAGE ────────────────────────────────────────────────────
+// ── STORAGE ────────────────────────────────────────────────────-
 const S = {
   get(k){try{const v=localStorage.getItem('clarito_'+k);return v?JSON.parse(v):null}catch{return null}},
   set(k,v){localStorage.setItem('clarito_'+k,JSON.stringify(v))}
