@@ -301,7 +301,7 @@ function parseTicketText(text){
 
   // ── Regexes globales ──────────────────────────────────────────
   const PRICE_RX    = /^(\d{1,3}[.,]\d{2})\s*[)€]?\s*$/;          // línea que es solo un precio
-  const INLINE_RX   = /^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*€?\s*$/;  // NOMBRE   PRECIO (2+ espacios)
+  const INLINE_RX   = /^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*[A-Z]?\s*$/; // NOMBRE   PRECIO [B/A] (2+ espacios)
   const QTY_OPEN_RX = /^(\d+)\s*[xX]\s*\($/;                       // "3 x (" o "2x ("
   // Formato qty en una sola línea que el OCR a veces produce: "3 x ( 1,29 )" o "X ( 1,29 )"
   const QTY_INLINE_RX = /^(\d+|[xX])\s*[xX]?\s*\(\s*(\d{1,3}[.,]\d{2})\s*\)?$/;
@@ -309,7 +309,7 @@ function parseTicketText(text){
   const SEP_RX      = /^[=\-*_.]{3,}$/;
   const DATE_RX     = [/((\d{2})[\/\-.](\d{2})[\/\-.](\d{2,4}))/,
                        /(\d{1,2})\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\w*\s+(\d{2,4})/i];
-  const TIME_RX     = /(\d{1,2}):(\d{2})(?::\d{2})?/;
+  const TIME_RX     = /(\d{1,2}):(\d{2})(?::(\d{2}))?/;
   const KG_RX       = /\d+[.,]\d+\s*kg|€\/kg|eur\/kg/i;
   const WEIGHT_RX   = /^[\d.,]+\s*(g|kg|ml|l|cl|gr?|lt?)\s*$/i;
 
@@ -344,6 +344,13 @@ function parseTicketText(text){
 
   // ── Detectar fecha y hora ─────────────────────────────────────
   let date=null, time=null;
+  // Primera pasada: buscar hora en línea sola HH:MM:SS (más fiable, al pie del ticket)
+  for(const l of lines){
+    const t=l.trim();
+    const standalone=t.match(/^(\d{1,2}):(\d{2}):\d{2}$/);
+    if(standalone){ time=`${standalone[1].padStart(2,'0')}:${standalone[2]}`; break; }
+  }
+  // Segunda pasada: fecha y hora inline si no se encontró standalone
   for(const l of lines){
     if(!date){
       for(const rx of DATE_RX){
@@ -360,7 +367,11 @@ function parseTicketText(text){
         }
       }
     }
-    if(!time){ const tm=l.match(TIME_RX); if(tm) time=`${tm[1].padStart(2,'0')}:${tm[2]}`; }
+    if(!time){
+      // Solo coger hora inline si no hay una standalone ya
+      const tm=l.match(/(\d{1,2}):(\d{2}):\d{2}/);
+      if(tm) time=`${tm[1].padStart(2,'0')}:${tm[2]}`;
+    }
     if(date&&time) break;
   }
 
@@ -408,10 +419,25 @@ function parseTicketText(text){
 
   // ── Cortar en línea de total / impuestos ──────────────────────
   // Todo lo que viene después de la primera línea de corte no es producto
-  const CUT_RX=/^(art\.?[\s.]*total|total[\s.]*a[\s.]*pagar|tipo\s*$|====+|base\s*$|cuota\s*$)/i;
+  const CUT_RX=/^(total\s*$|art\.?[\s.]*total|total[\s.]*a[\s.]*pagar|tipo\s*$|====+|base\s*$|cuota\s*$)/i;
+  // Pre-detectar formato Lidl columnas antes de cortar
+  // En Lidl columnas los precios B/A vienen DESPUÉS de TOTAL — no cortar en TOTAL
+  // Detectar Lidl columnas inline (sin usar LIDL_PRICE_RX que aún no está declarado)
+  const _lidlPriceRx=/^\d{1,3}[.,]\d{2}\s*[A-Z]\s*$/;
+  const isLidlColumnFormat=(()=>{
+    let totIdx=-1;
+    for(let li=0;li<lines.length;li++) if(/^total$/i.test(lines[li].trim())){totIdx=li;break;}
+    if(totIdx<0) return false;
+    const after=lines.slice(totIdx).filter(l=>_lidlPriceRx.test(l.trim())).length;
+    const before=lines.slice(0,totIdx).filter(l=>_lidlPriceRx.test(l.trim())).length;
+    return after>=3&&before===0;
+  })();
+  const CUT_RX_ACTIVE=isLidlColumnFormat
+    ?/^(art\.?[\s.]*total|total[\s.]*a[\s.]*pagar|tipo\s*$|====+|base\s*$|cuota\s*$)/i
+    :CUT_RX;
   let cutIdx=lines.length;
   for(let ti=0;ti<lines.length;ti++){
-    if(CUT_RX.test(lines[ti].trim())){cutIdx=ti;break;}
+    if(CUT_RX_ACTIVE.test(lines[ti].trim())){cutIdx=ti;break;}
   }
   const productLines=lines.slice(0,cutIdx);
 
@@ -546,8 +572,13 @@ function parseTicketText(text){
     // ── Detectar formato Lidl columnas (iPad/WhatsApp):
     // nombres primero, luego TOTAL, luego precios con B/A ──
     // Señal: hay bloque de líneas "X,XX B" o "X,XX A" después de TOTAL
-    const lidlPriceBlock=pLines.filter(l=>LIDL_PRICE_RX.test(l.trim()));
-    const hasLidlColumns=lidlPriceBlock.length>=3;
+    // Detectar formato Lidl columnas: precios B/A aparecen SOLO después de TOTAL
+    // (no intercalados con nombres como en formato inline iPhone)
+    let totalIdx=-1;
+    for(let li=0;li<pLines.length;li++) if(/^total$/i.test(pLines[li].trim())){totalIdx=li;break;}
+    const pricesBeforeTotal=totalIdx>=0?pLines.slice(0,totalIdx).filter(l=>LIDL_PRICE_RX.test(l.trim())).length:0;
+    const pricesAfterTotal=totalIdx>=0?pLines.slice(totalIdx).filter(l=>LIDL_PRICE_RX.test(l.trim())).length:0;
+    const hasLidlColumns=pricesAfterTotal>=3&&pricesBeforeTotal===0;
 
     if(hasLidlColumns){
       // Recoger nombres (antes del TOTAL) y precios (después del TOTAL/ENTREGA)
@@ -589,14 +620,8 @@ function parseTicketText(text){
           if(nm.length<2) continue;
           // Si tiene info kg, es fruta/verdura — precio ya es el total
           if(entry._kgInfo){
-            const kgM=entry._kgInfo.match(/^([\d.,]+)\s*kg\s*[xX]\s*([\d.,]+)/i);
-            if(kgM){
-              const kg=parseFloat(kgM[1].replace(',','.'));
-              const unitKg=parseFloat(kgM[2].replace(',','.'));
-              out.push(makeProduct(nm,entry.raw,unitKg,parseFloat(kg.toFixed(3))));
-            } else {
-              out.push(makeProduct(nm,entry.raw,price,1));
-            }
+            // Fruta/verdura por peso: mostrar como 1 unidad al precio total
+            out.push(makeProduct(nm,entry.raw,price,1));
           } else {
             out.push(makeProduct(nm,entry.raw,price,1));
           }
@@ -615,13 +640,15 @@ function parseTicketText(text){
       if(/^\d{1,2}[\/.:]\d{2}/.test(trimmed)) continue;
       if(MULT_RX.test(trimmed)||UNIT_PRICE_X_RX.test(trimmed)) continue;
       if(isKgInfo(trimmed)||WEIGHT_RX.test(trimmed)) continue;
+      if(store&&trimmed.toLowerCase()===store.toLowerCase()) continue; // skip nombre tienda
 
-      // Lidl inline: "ZUMO MANZANA    1,15 B"
-      const lidlInlineM=trimmed.match(/^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*[A-Z]?\s*$/);
+      // Lidl inline: "ZUMO MANZANA 1,15 B" (1+ espacios, con o sin letra IVA)
+      const lidlInlineM=trimmed.match(/^(.+?)\s+(\d{1,3}[.,]\d{2})\s*[A-Z]?\s*$/);
       if(lidlInlineM){
         const rawName=lidlInlineM[1].trim();
         const price=parseFloat(lidlInlineM[2].replace(',','.'));
-        if(price>0&&price<=500&&rawName.length>=2&&!isSkip(rawName)&&!/^\d/.test(rawName)){
+        if(price>0&&price<=500&&rawName.length>=2&&!isSkip(rawName)&&!/^\d/.test(rawName)
+           &&!/^total$/i.test(rawName)&&!(store&&rawName.toLowerCase()===store.toLowerCase())){
           const nm=cleanName(rawName);
           if(nm.length>=2) out.push(makeProduct(nm,rawName,price,1));
         }
@@ -912,7 +939,7 @@ function renderHome(){
   document.getElementById('view').innerHTML=`
     <div class="screen-header">
       <div style="display:flex;align-items:flex-end;gap:12px">
-        <img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1) brightness(0.87) hue-rotate(210deg) saturate(0.3)" onerror="this.style.display='none'"/>
+        <img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1) brightness(0.87) saturate(0.15) hue-rotate(210deg)" onerror="this.style.display='none'"/>
         <h1 style="padding-bottom:2px">Clarito</h1>
       </div>
     </div>
@@ -1014,7 +1041,7 @@ function renderTickets(){
     <div class="screen-header"><h1>Tickets</h1><p>${tickets.length} registrados</p></div>
     <div class="upload-zone" onclick="triggerFileGallery()">
       <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3"/><polyline points="12 8 12 16"/><polyline points="8 12 12 8 16 12"/></svg>
-      <h3>Subir ticket</h3><p>Elige "Fotos" en el menú que aparece</p>
+      <h3>Subir ticket</h3>
     </div>
     <div class="upload-actions">
       <button class="btn-secondary" onclick="triggerCamera()">Cámara</button>
@@ -1434,7 +1461,7 @@ function getPredictions(){
 // ── SETTINGS ───────────────────────────────────────────────────
 function renderSettings(){
   document.getElementById('view').innerHTML=`
-    <div class="screen-header"><div style="display:flex;align-items:flex-end;gap:12px"><img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1) brightness(0.87) hue-rotate(210deg) saturate(0.3)" onerror="this.style.display='none'"/><h1 style="padding-bottom:2px">Configuración</h1></div></div>
+    <div class="screen-header"><div style="display:flex;align-items:flex-end;gap:12px"><img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1) brightness(0.87) saturate(0.15) hue-rotate(210deg)" onerror="this.style.display='none'"/><h1 style="padding-bottom:2px">Configuración</h1></div></div>
     <div style="height:8px"></div>
     <div class="settings-section">
       <div class="settings-section-title">Personas (${DB.persons.length})</div>
