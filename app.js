@@ -29,6 +29,7 @@ let DB = {
   ocrKey:'helloworld',
   visionKey:'',
   groqKey:'',
+  groqStats:{calls:0,lastReset:null,tokensUsed:0},
   persons:[
     {id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},
     {id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}
@@ -44,6 +45,7 @@ function loadDB(){
   DB.ocrKey=S.get('ocrKey')||DB.ocrKey||'helloworld';
   DB.visionKey=S.get('visionKey')||DB.visionKey||'';
   DB.groqKey=S.get('groqKey')||DB.groqKey||'';
+  try{const gs=S.get('groqStats');if(gs)DB.groqStats=JSON.parse(gs);}catch{}
   if(!DB.knowledge) DB.knowledge={products:{},cards:{}};
   if(!DB.aiQuestions) DB.aiQuestions=[];
   if(!DB.aiConvMessages) DB.aiConvMessages=[];
@@ -455,6 +457,7 @@ function parseTicketText(text){
     parseGeneric(productLines, products);
   }
 
+  total=parseFloat(String(total).replace(',','.'));
   return{store,date,time,last4,total,products,errors:[],warnings:[]};
 
   // ═══════════════════════════════════════════════════════════════
@@ -773,6 +776,12 @@ async function callGroq(prompt){
   }).catch(e=>{throw new Error('Red bloqueada: '+e.message);});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'Groq HTTP '+res.status);}
   const data=await res.json();
+  // Rastrear uso de Groq
+  if(!DB.groqStats) DB.groqStats={calls:0,lastReset:null,tokensUsed:0};
+  DB.groqStats.calls=(DB.groqStats.calls||0)+1;
+  DB.groqStats.tokensUsed=(DB.groqStats.tokensUsed||0)+(data.usage?.total_tokens||0);
+  if(!DB.groqStats.lastReset) DB.groqStats.lastReset=new Date().toISOString().slice(0,7);
+  S.set('groqStats',JSON.stringify(DB.groqStats));
   return data.choices?.[0]?.message?.content||'';
 }
 
@@ -828,6 +837,7 @@ async function processFile(file){
     try{
       setOCRStatus('Leyendo ticket...');
       ocrText=await googleVisionExtract(b64);
+      console.log('OCR RAW:\n'+ocrText);
     }catch(ocrErr){
       console.warn('Google Vision falló:', ocrErr.message);
       setOCRStatus('Vision falló...');
@@ -842,7 +852,7 @@ async function processFile(file){
       console.log('Parser local:', result.products.length, 'productos');
 
       // ── PASO 3: Si el parser saca pocos productos, mejora con Groq ──
-      if(result.products.length<2&&DB.groqKey){
+      if(result.products.length<1&&DB.groqKey){
         setOCRStatus('Mejorando con IA...');
         try{
           const groqResult=await groqParseText(ocrText);
@@ -1475,6 +1485,7 @@ function renderSettings(){
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="editVisionKey()"><div class="settings-icon" style="background:#1a3a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h3M7 12h3M7 16h3M14 8h3M14 12h3M14 16h3"/></svg></div><div class="settings-label">Google Vision Key</div><div class="settings-value">${DB.visionKey?'•••'+DB.visionKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
         <div class="settings-row" onclick="editGroqKey()"><div class="settings-icon" style="background:#2a1a3a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="settings-label">Groq Key (chat IA)</div><div class="settings-value">${DB.groqKey?'•••'+DB.groqKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
+        ${DB.groqKey?('<div class="settings-row" onclick="showGroqStats()" style="cursor:pointer"><div class="settings-icon" style="background:#1a2a3a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><polyline points=\'22 12 18 12 15 21 9 3 6 12 2 12\'/></svg></div><div class="settings-label">Uso de Groq</div><div class="settings-value">'+(DB.groqStats?.calls||0)+' llamadas · '+Math.round((DB.groqStats?.tokensUsed||0)/1000)+' k tokens</div><div class="settings-arrow">›</div></div>'):''}
       </div>
     </div>
     <div class="settings-section">
@@ -1543,6 +1554,32 @@ function deleteKnowledgeProduct(key){
   delete DB.knowledge.products[key];
   saveDB();
   editKnowledgeProducts(); // refresca el modal
+}
+function showGroqStats(){
+  const s=DB.groqStats||{};
+  const calls=s.calls||0;
+  const tokens=s.tokensUsed||0;
+  const month=s.lastReset||'—';
+  // Groq free tier: sin límite mensual, solo rate limit (30 req/min, 6000 tokens/min)
+  openModal(`<div class="modal-title">Uso de Groq IA</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin:16px 0">
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px">
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:4px">Llamadas totales</div>
+        <div style="font-size:28px;font-weight:800">${calls}</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px">
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:4px">Tokens usados</div>
+        <div style="font-size:28px;font-weight:800">${(tokens/1000).toFixed(1)}k</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px">
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:6px">Plan gratuito Groq</div>
+        <div style="font-size:13px;color:var(--txt1);line-height:1.5">Sin límite mensual de tokens. Rate limit: 30 llamadas/min y 6.000 tokens/min. El plan gratuito no caduca.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-secondary" style="flex:1" onclick="if(confirm('¿Resetear contadores?')){DB.groqStats={calls:0,lastReset:new Date().toISOString().slice(0,7),tokensUsed:0};saveDB();closeModal();renderSettings();}">Resetear</button>
+      <button class="btn-primary" style="flex:1" onclick="closeModal()">Cerrar</button>
+    </div>`);
 }
 function addPerson(){const idx=DB.persons.length;DB.persons.push({id:'p'+(idx+1),name:'Persona '+(idx+1),color:PRESET_COLORS[idx%PRESET_COLORS.length],cards:[]});saveDB();renderSettings();editPerson(idx);}
 function editPerson(idx){
