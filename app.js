@@ -295,10 +295,17 @@ function parseTicketText(text){
     if(m){last4=m[1];break;}
   }
 
-  // ── Detectar productos ──
-  const SKIP_RX=/^(total|subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[eé]f|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale)/i;
+// ── Detectar productos ──
+  // Cortar el texto en la primera línea de TOTAL — todo lo de después es impuestos
+  let totalLineIdx=lines.length;
+  for(let ti=0;ti<lines.length;ti++){
+    if(/^total\b/i.test(lines[ti].trim())){totalLineIdx=ti;break;}
+  }
+  const productLines=lines.slice(0,totalLineIdx);
+
+  const SKIP_RX=/^(subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[eé]f|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale)/i;
   const PRICE_ONLY_RX=/^\s*(\d{1,3}[.,]\d{2})\s*€?\s*$/;
-  const KG_INFO_RX=/\d+[.,]\d+\s*kg|€\/kg|eur\/kg|\d+[.,]\d+\s*[xX]\s*\d+[.,]\d+/i; // línea de info kg (NO saltar el nombre)
+  const KG_INFO_RX=/\d+[.,]\d+\s*kg|€\/kg|eur\/kg|\d+[.,]\d+\s*[xX]\s*\d+[.,]\d+/i;
   const INLINE_PRICE_RX=/^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*€?\s*$/;
   const QTY_PREFIX_RX=/^(\d+)\s+(.+)/;
 
@@ -309,29 +316,17 @@ function parseTicketText(text){
       .replace(/\s*€\/u.*/i,'')
       .trim();
   }
-
-  // Determina si una línea es un "precio solo" o info de kg que debemos saltar al recoger precios
   function isPriceLine(l){return PRICE_ONLY_RX.test(l);}
   function isKgInfoLine(l){return KG_INFO_RX.test(l)&&!PRICE_ONLY_RX.test(l);}
 
-  // Encontrar la línea donde aparece TOTAL para filtrar después de ella
-  let totalLineIdx=lines.length;
-  for(let ti=0;ti<lines.length;ti++){
-    if(/^total/i.test(lines[ti].trim())){totalLineIdx=ti;break;}
-  }
-
   const products=[];
   let i=0;
-  while(i<lines.length){
-    const line=lines[i];
+  while(i<productLines.length){
+    const line=productLines[i];
     i++;
-
     const trimmed=line.trim();
     if(trimmed.length<2) continue;
     if(SKIP_RX.test(trimmed)) continue;
-    // % solo se filtra DESPUÉS de la línea de TOTAL (i-1 porque i ya se incrementó)
-    if((i-1)>totalLineIdx&&trimmed.includes('%')) continue;
-    // No saltar líneas de kg aquí — solo ignorarlas en la recolección de precios
 
     // Formato inline: NOMBRE    1,45
     const inlineM=line.match(INLINE_PRICE_RX);
@@ -348,25 +343,19 @@ function parseTicketText(text){
       continue;
     }
 
-    // Si es una línea de solo precio o info de kg, saltar
     if(isPriceLine(trimmed)||isKgInfoLine(trimmed)) continue;
-
-    // Línea de fecha/hora — saltar
     if(/^\d{1,2}\/\d{2}\/\d{2,4}/.test(trimmed)||/^\d{1,2}:\d{2}/.test(trimmed)) continue;
 
-    // Formato Mercadona: nombre en una línea, precios/info en líneas siguientes
+    // Formato Mercadona: nombre seguido de precios/kg en líneas siguientes
+    // También consume líneas vacías (ej: CALABACIN con línea en blanco antes del kg)
     const priceLines=[];
     let j=i;
-    while(j<lines.length){
-      const next=lines[j].trim();
-      if(isPriceLine(next)){
-        priceLines.push(parseFloat(next.replace(',','.')));
-        j++;
-      } else if(isKgInfoLine(next)){
-        j++;
-      } else {
-        break;
-      }
+    while(j<productLines.length){
+      const next=productLines[j].trim();
+      if(next.length===0){j++;continue;}
+      if(isPriceLine(next)){priceLines.push(parseFloat(next.replace(',','.')));j++;}
+      else if(isKgInfoLine(next)){j++;}
+      else break;
     }
 
     if(priceLines.length>0){
@@ -381,12 +370,10 @@ function parseTicketText(text){
       if(!/^\d+$/.test(name)&&name.length>=2)
         products.push(makeProduct(name,rawName,unitPrice,qty));
     }
-    // Si no hay priceLines, es una línea de texto sin precio — ignorar
   }
 
   return{store,date,time,last4,total,products,errors:[],warnings:[]};
 }
-
 function makeProduct(name,rawName,unitPrice,qty=1){
   const total=parseFloat((unitPrice*qty).toFixed(2));
   return{
@@ -757,9 +744,9 @@ function renderTicketEditor(){
         <div class="te-section-title">Información</div>
         <div class="card" style="margin:0 0 12px">
           <div class="field-row"><label class="field-label">Supermercado</label><input value="${t.store||''}" placeholder="Ej: Mercadona" oninput="currentTicket.store=this.value"/></div>
-          <div style="display:flex;gap:6px;margin-top:10px">
-            <div style="flex:3;min-width:0"><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" style="font-size:13px;padding:6px 4px;min-width:0;width:100%;box-sizing:border-box" onchange="currentTicket.date=this.value"/></div>
-            <div style="flex:2;min-width:0"><label class="field-label">Hora</label><input type="time" value="${t.time||''}" style="font-size:13px;padding:6px 4px;min-width:0;width:100%;box-sizing:border-box" onchange="currentTicket.time=this.value"/></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+            <div><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" style="font-size:13px;padding:8px 8px;width:100%;box-sizing:border-box" onchange="currentTicket.date=this.value"/></div>
+            <div><label class="field-label">Hora</label><input type="time" value="${t.time||''}" style="font-size:13px;padding:8px 8px;width:100%;box-sizing:border-box" onchange="currentTicket.time=this.value"/></div>
           </div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Últimos 4 dígitos tarjeta</label><input value="${t.last4||''}" placeholder="4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:600"/></div>
@@ -1172,6 +1159,7 @@ function renderSettings(){
         <div class="settings-row" onclick="resetAll()"><div class="settings-label" style="color:var(--red)">Borrar todos los datos</div></div>
       </div>
     </div>
+    <div style="margin:0 16px 16px"><button class="btn-secondary" style="width:100%" onclick="location.reload()">Actualizar app</button></div>
     <p style="text-align:center;font-size:11px;color:var(--txt3);padding:20px">Clarito · Datos guardados localmente.</p>`;
 }
 
