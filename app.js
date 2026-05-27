@@ -10,15 +10,16 @@ const S = {
 
 const PRESET_COLORS = [
   '#ea580c', // naranja oscuro
+  '#c2410c', // naranja más oscuro
   '#a855f7', // morado
   '#ec4899', // rosa
+  '#f9a8d4', // rosa clarito
   '#38bdf8', // celeste
   '#22c55e', // verde
   '#ef4444', // rojo
   '#3b82f6', // azul
   '#eab308', // amarillo
   '#14b8a6', // turquesa
-  '#f43f5e', // coral
   '#e879b0', // rosa bebé
 ];
 
@@ -306,7 +307,7 @@ function parseTicketText(text){
   const SKIP_RX=/^(subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[eé]f|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale)/i;
   const PRICE_ONLY_RX=/^\s*(\d{1,3}[.,]\d{2})\s*€?\s*$/;
   const KG_INFO_RX=/\d+[.,]\d+\s*kg|€\/kg|eur\/kg|\d+[.,]\d+\s*[xX]\s*\d+[.,]\d+/i;
-  const INLINE_PRICE_RX=/^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*€?\s*$/;
+  const INLINE_PRICE_RX=/^(.+?)\s+(\d{1,3}[.,]\d{2})\s*€?\s*$/;
   const QTY_PREFIX_RX=/^(\d+)\s+(.+)/;
 
   function cleanProductName(raw){
@@ -612,7 +613,7 @@ function renderHome(){
     <div class="balance-hero">
       <div class="balance-hero-label">Balance actual</div>
       ${bal.amount<0.01
-        ?`<div class="balance-hero-amount" style="color:#4ade80">Cuentas al día</div>`
+        ?`<div class="balance-hero-amount" style="color:#22a869">Cuentas al día</div>`
         :`<div class="balance-hero-amount" style="color:var(--amber)">${fmt(bal.amount)}</div>
           <div style="font-size:13px;color:var(--txt1);margin-top:4px">${personName(bal.owes)} debe a ${personName(bal.owes===DB.persons[0].id?DB.persons[1]?.id:DB.persons[0].id)}</div>`}
       <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px">
@@ -982,7 +983,7 @@ function renderBalance(){
   document.getElementById('view').innerHTML=`
     <div class="screen-header"><h1>Balance</h1><p>Deudas y liquidaciones</p></div>
     ${amount<0.01
-      ?`<div class="balance-card"><div class="bc-owes" style="color:#4ade80">Cuentas al día</div><div class="bc-amount" style="font-size:28px">Sin deuda</div></div>`
+      ?`<div class="balance-card"><div class="bc-owes" style="color:#22a869">Cuentas al día</div><div class="bc-amount" style="font-size:28px">Sin deuda</div></div>`
       :`<div class="balance-card"><div class="bc-owes">${personName(owes)} debe a ${creditor?.name}</div><div class="bc-amount">${fmt(amount)}</div></div>
         <button class="settle-btn" onclick="settleAccounts()">Cuentas saldadas</button>`}
     <div style="margin:0 16px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
