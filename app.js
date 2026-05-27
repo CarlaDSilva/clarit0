@@ -9,7 +9,7 @@ const S = {
 };
 
 const PRESET_COLORS = [
-  '#f97316', // naranja
+  '#ea580c', // naranja oscuro
   '#a855f7', // morado
   '#ec4899', // rosa
   '#38bdf8', // celeste
@@ -329,8 +329,8 @@ function parseTicketText(text){
     const trimmed=line.trim();
     if(trimmed.length<2) continue;
     if(SKIP_RX.test(trimmed)) continue;
-    // % y / solo se filtran DESPUÉS de la línea de TOTAL
-    if(i>totalLineIdx&&(trimmed.includes('%'))) continue;
+    // % solo se filtra DESPUÉS de la línea de TOTAL (i-1 porque i ya se incrementó)
+    if((i-1)>totalLineIdx&&trimmed.includes('%')) continue;
     // No saltar líneas de kg aquí — solo ignorarlas en la recolección de precios
 
     // Formato inline: NOMBRE    1,45
@@ -757,9 +757,9 @@ function renderTicketEditor(){
         <div class="te-section-title">Información</div>
         <div class="card" style="margin:0 0 12px">
           <div class="field-row"><label class="field-label">Supermercado</label><input value="${t.store||''}" placeholder="Ej: Mercadona" oninput="currentTicket.store=this.value"/></div>
-          <div style="display:flex;gap:8px;margin-top:10px">
-            <div style="flex:3"><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" style="font-size:15px;padding:8px 6px;min-width:0" onchange="currentTicket.date=this.value"/></div>
-            <div style="flex:2"><label class="field-label">Hora</label><input type="time" value="${t.time||''}" style="font-size:15px;padding:8px 6px;min-width:0" onchange="currentTicket.time=this.value"/></div>
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <div style="flex:3;min-width:0"><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" style="font-size:13px;padding:6px 4px;min-width:0;width:100%;box-sizing:border-box" onchange="currentTicket.date=this.value"/></div>
+            <div style="flex:2;min-width:0"><label class="field-label">Hora</label><input type="time" value="${t.time||''}" style="font-size:13px;padding:6px 4px;min-width:0;width:100%;box-sizing:border-box" onchange="currentTicket.time=this.value"/></div>
           </div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Últimos 4 dígitos tarjeta</label><input value="${t.last4||''}" placeholder="4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:600"/></div>
@@ -994,7 +994,7 @@ function renderBalance(){
   document.getElementById('view').innerHTML=`
     <div class="screen-header"><h1>Balance</h1><p>Deudas y liquidaciones</p></div>
     ${amount<0.01
-      ?`<div class="balance-card"><div class="bc-owes" style="color:var(--green)">Cuentas al dia</div><div class="bc-amount" style="font-size:28px">Sin deuda</div></div>`
+      ?`<div class="balance-card"><div class="bc-owes" style="color:#4ade80">Cuentas al día</div><div class="bc-amount" style="font-size:28px">Sin deuda</div></div>`
       :`<div class="balance-card"><div class="bc-owes">${personName(owes)} debe a ${creditor?.name}</div><div class="bc-amount">${fmt(amount)}</div></div>
         <button class="settle-btn" onclick="settleAccounts()">Cuentas saldadas</button>`}
     <div style="margin:0 16px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
@@ -1367,6 +1367,7 @@ setTimeout(()=>{
     .ai-qa-q{font-size:15px!important;}
     .settings-label{font-size:15px!important;}
     #nav{padding-bottom:max(14px,env(safe-area-inset-bottom))!important;}
+    :root{--green:#34c97a;}
 
     @media(min-width:520px){
       body{display:flex;justify-content:center;align-items:flex-start;background:#050507;min-height:100vh;}
