@@ -297,27 +297,34 @@ function parseTicketText(text){
   }
 
 // ── Detectar productos ──
-  // Cortar el texto en la primera línea de TOTAL — todo lo de después es impuestos
+  // Cortar en la primera línea que sea TOTAL (con o sin texto después) o "TOTAL A PAGAR"
   let totalLineIdx=lines.length;
   for(let ti=0;ti<lines.length;ti++){
-    if(/^total\b/i.test(lines[ti].trim())){totalLineIdx=ti;break;}
+    if(/^total(\s|$|\s*a\s*pagar)/i.test(lines[ti].trim())){totalLineIdx=ti;break;}
   }
   const productLines=lines.slice(0,totalLineIdx);
 
-  const SKIP_RX=/^(subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[eé]f|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale)/i;
+  const SKIP_RX=/^(subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[eé]f|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale|art\.\s*$|\d+,\d+%|\d+\.\d+%)/i;
   const PRICE_ONLY_RX=/^\s*(\d{1,3}[.,]\d{2})\s*€?\s*$/;
+  // Línea de cierre de bloque qty Carrefour: "1,59)" o "3,87)" — precio seguido de paréntesis
+  const PAREN_CLOSE_RX=/^\d{1,3}[.,]\d{2}\)?\s*$/;
+  // Línea de apertura de bloque qty Carrefour: "3 x (" o "2 x ("
+  const QTY_OPEN_RX=/^(\d+)\s*[xX]\s*\(/;
   const KG_INFO_RX=/\d+[.,]\d+\s*kg|€\/kg|eur\/kg|\d+[.,]\d+\s*[xX]\s*\d+[.,]\d+/i;
   const INLINE_PRICE_RX=/^(.+?)\s+(\d{1,3}[.,]\d{2})\s*€?\s*$/;
   const QTY_PREFIX_RX=/^(\d+)\s+(.+)/;
+  // Barcode-only lines (8+ digits, no letters)
+  const BARCODE_RX=/^\d{8,}$/;
 
   function cleanProductName(raw){
     return raw
       .replace(/\d+[.,]\d+\s*kg.*/i,'')
       .replace(/\s*€\/kg.*/i,'')
       .replace(/\s*€\/u.*/i,'')
+      .replace(/\)$/,'')
       .trim();
   }
-  function isPriceLine(l){return PRICE_ONLY_RX.test(l);}
+  function isPriceLine(l){return PRICE_ONLY_RX.test(l)||PAREN_CLOSE_RX.test(l);}
   function isKgInfoLine(l){return KG_INFO_RX.test(l)&&!PRICE_ONLY_RX.test(l);}
 
   const products=[];
@@ -328,17 +335,54 @@ function parseTicketText(text){
     const trimmed=line.trim();
     if(trimmed.length<2) continue;
     if(SKIP_RX.test(trimmed)) continue;
+    if(BARCODE_RX.test(trimmed)) continue;
+    if(/^\d{1,2}\/\d{2}\/\d{2,4}/.test(trimmed)||/^\d{1,2}:\d{2}/.test(trimmed)) continue;
+
+    // ── Formato Carrefour qty: "3 x (\n1,29)\nNOMBRE\nNOMBRE\n3,87" ──
+    const qtyOpenM=trimmed.match(QTY_OPEN_RX);
+    if(qtyOpenM){
+      const qty=parseInt(qtyOpenM[1]);
+      // Consumir la línea de precio unitario "1,29)" si viene a continuación
+      let unitPrice=null;
+      if(i<productLines.length){
+        const nextL=productLines[i].trim();
+        const upm=nextL.match(/^(\d{1,3}[.,]\d{2})\)?$/);
+        if(upm){unitPrice=parseFloat(upm[1].replace(',','.'));i++;}
+      }
+      // Consumir líneas de nombre hasta encontrar el precio total
+      const nameLines=[];
+      while(i<productLines.length){
+        const nl=productLines[i].trim();
+        if(isPriceLine(nl)||BARCODE_RX.test(nl)) break;
+        if(SKIP_RX.test(nl)){i++;continue;}
+        if(nl.length>=2) nameLines.push(nl);
+        i++;
+      }
+      // Precio total en la línea siguiente (puede ser "3,87" o "3,87)")
+      let totalPrice=null;
+      if(i<productLines.length){
+        const tl=productLines[i].trim().replace(')','');
+        const tm=tl.match(/^(\d{1,3}[.,]\d{2})$/);
+        if(tm){totalPrice=parseFloat(tm[1].replace(',','.'));i++;}
+      }
+      if(!unitPrice&&totalPrice) unitPrice=parseFloat((totalPrice/qty).toFixed(2));
+      if(nameLines.length>0&&unitPrice){
+        const rawName=nameLines[0];
+        const name=cleanProductName(rawName);
+        if(name.length>=2) products.push(makeProduct(name,rawName,unitPrice,qty));
+      }
+      continue;
+    }
 
     // Formato inline: NOMBRE    1,45
     const inlineM=line.match(INLINE_PRICE_RX);
     if(inlineM){
       const rawName=inlineM[1].trim();
       const price=parseFloat(inlineM[2].replace(',','.'));
-      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)&&!SKIP_RX.test(rawName)&&!isKgInfoLine(rawName)){
+      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)&&!SKIP_RX.test(rawName)&&!isKgInfoLine(rawName)&&!BARCODE_RX.test(rawName)){
         const qm=rawName.match(QTY_PREFIX_RX);
         const qty=qm?parseInt(qm[1]):1;
         const name=cleanProductName(qm?qm[2]:rawName);
-        // Inline: Vision ya pone el total directamente, unitPrice = price/qty
         const unitPrice=qty>1?parseFloat((price/qty).toFixed(2)):price;
         if(name.length>=2) products.push(makeProduct(name,rawName,unitPrice,qty));
       }
@@ -346,7 +390,6 @@ function parseTicketText(text){
     }
 
     if(isPriceLine(trimmed)||isKgInfoLine(trimmed)) continue;
-    if(/^\d{1,2}\/\d{2}\/\d{2,4}/.test(trimmed)||/^\d{1,2}:\d{2}/.test(trimmed)) continue;
 
     // Formato Mercadona: nombre seguido de precios/kg en líneas siguientes
     // También consume líneas vacías (ej: CALABACIN con línea en blanco antes del kg)
@@ -355,7 +398,7 @@ function parseTicketText(text){
     while(j<productLines.length){
       const next=productLines[j].trim();
       if(next.length===0){j++;continue;}
-      if(isPriceLine(next)){priceLines.push(parseFloat(next.replace(',','.')));j++;}
+      if(isPriceLine(next)){priceLines.push(parseFloat(next.replace(/[)]/g,'').replace(',','.').trim()));j++;}
       else if(isKgInfoLine(next)){j++;}
       else break;
     }
@@ -1195,7 +1238,13 @@ function assignKnowledgeProduct(key,pid){
 }
 function renameKnowledgeProduct(key,newName){
   if(!newName.trim()) return;
-  if(DB.knowledge.products[key]) DB.knowledge.products[key].alias=newName.trim();
+  const entry=DB.knowledge.products[key];
+  if(!entry) return;
+  const trimmed=newName.trim();
+  entry.alias=trimmed;
+  // Indexar tambien por nombre normalizado nuevo para que futuros OCR matcheen
+  const newKey=normalizeKey(trimmed);
+  if(newKey&&newKey!==key) DB.knowledge.products[newKey]={...entry,alias:trimmed};
 }
 function deleteKnowledgeProduct(key){
   delete DB.knowledge.products[key];
