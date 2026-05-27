@@ -337,6 +337,7 @@ function parseTicketText(text){
         const qm=rawName.match(QTY_PREFIX_RX);
         const qty=qm?parseInt(qm[1]):1;
         const name=cleanProductName(qm?qm[2]:rawName);
+        // Inline: Vision ya pone el total directamente, unitPrice = price/qty
         const unitPrice=qty>1?parseFloat((price/qty).toFixed(2)):price;
         if(name.length>=2) products.push(makeProduct(name,rawName,unitPrice,qty));
       }
@@ -495,7 +496,7 @@ async function processFile(file){
     // ── PASO 1: OCR.space extrae texto ──
     let ocrText='';
     try{
-      setOCRStatus('Leyendo ticket con Google Vision...');
+      setOCRStatus('Leyendo ticket...');
       ocrText=await googleVisionExtract(b64);
     }catch(ocrErr){
       console.warn('Google Vision falló:', ocrErr.message);
@@ -744,9 +745,9 @@ function renderTicketEditor(){
         <div class="te-section-title">Información</div>
         <div class="card" style="margin:0 0 12px">
           <div class="field-row"><label class="field-label">Supermercado</label><input value="${t.store||''}" placeholder="Ej: Mercadona" oninput="currentTicket.store=this.value"/></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-            <div><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" style="font-size:13px;padding:8px 8px;width:100%;box-sizing:border-box" onchange="currentTicket.date=this.value"/></div>
-            <div><label class="field-label">Hora</label><input type="time" value="${t.time||''}" style="font-size:13px;padding:8px 8px;width:100%;box-sizing:border-box" onchange="currentTicket.time=this.value"/></div>
+          <div class="datetime-row">
+            <div><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" onchange="currentTicket.date=this.value"/></div>
+            <div><label class="field-label">Hora</label><input type="time" value="${t.time||''}" onchange="currentTicket.time=this.value"/></div>
           </div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Últimos 4 dígitos tarjeta</label><input value="${t.last4||''}" placeholder="4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:600"/></div>
@@ -1339,33 +1340,4 @@ setTimeout(()=>{
   },100);
 },2500);
 
-// ── RESPONSIVE: tablet/desktop handled via CSS injection ──
-// This is appended once on load
-(function injectResponsiveCSS(){
-  const style=document.createElement('style');
-  style.textContent=`
-    /* Bigger small text */
-    .field-label{font-size:14px!important;}
-    .ticket-date,.ticket-payer,.bar-amt{font-size:14px!important;}
-    .product-name-raw{font-size:12px!important;}
-    .badge,.settings-value{font-size:13px!important;}
-    .stat-label{font-size:12px!important;}
-    .recent-label{font-size:14px!important;}
-    .nav-btn span{font-size:11px!important;}
-    .ai-qa-q{font-size:15px!important;}
-    .settings-label{font-size:15px!important;}
-    #nav{padding-bottom:max(14px,env(safe-area-inset-bottom))!important;}
-    :root{--green:#34c97a;}
-
-    @media(min-width:520px){
-      body{display:flex;justify-content:center;align-items:flex-start;background:#050507;min-height:100vh;}
-      #app{width:33vw;min-width:340px;max-width:480px;flex-shrink:0;border-left:1px solid #1a1a22;border-right:1px solid #1a1a22;box-shadow:0 0 80px rgba(0,0,0,.9);}
-      #nav{width:33vw;min-width:340px;max-width:480px;}
-      #setup-screen{width:33vw;min-width:340px;max-width:480px;margin:0 auto;}
-      .ticket-editor,.me-sheet,.ai-sheet{width:33vw;min-width:340px;max-width:480px;left:50%;transform:translateX(-50%);}
-      .modal-overlay{justify-content:center;}
-      .modal-sheet{width:33vw;min-width:340px;max-width:480px;border-radius:20px;margin-bottom:0;position:relative;align-self:flex-end;margin:auto auto 0;}
-    }
-  `;
-  document.head.appendChild(style);
-})();
+// CSS moved to app.css
