@@ -311,7 +311,9 @@ function parseTicketText(text){
   const QTY_INLINE_RX = /^(\d+|[xX])\s*[xX]?\s*\(\s*(\d{1,3}[.,]\d{2})\s*\)?$/;
   const BARCODE_RX  = /^\d{7,}$/;
   const SEP_RX      = /^[=\-*_.]{3,}$/;
-  const DATE_RX     = [/((\d{2})[\/\-.](\d{2})[\/\-.](\d{2,4}))/,
+  const DATE_RX     = [/((\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4}))/,  // DD/MM/YYYY o D/M/YYYY
+                       /(\d{2})\s+(\d{2})\s+(\d{4})/,           // DD MM YYYY (espacios, Froiz)
+
                        /(\d{1,2})\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\w*\s+(\d{2,4})/i];
   const TIME_RX     = /(\d{1,2}):(\d{2})(?::(\d{2}))?/;
   const KG_RX       = /\d+[.,]\d+\s*kg|€\/kg|eur\/kg/i;
@@ -359,15 +361,17 @@ function parseTicketText(text){
   // Segunda pasada: fecha y hora inline si no se encontró standalone
   for(const l of lines){
     if(!date){
-      for(const rx of DATE_RX){
+      for(let ri=0;ri<DATE_RX.length;ri++){
+        const rx=DATE_RX[ri];
         const m=l.match(rx);
         if(m){
           try{
             let d,mo,y;
-            if(rx===DATE_RX[0]){ d=m[2];mo=m[3];y=m[4]; }
-            else{ d=String(m[1]).padStart(2,'0');mo='01';y=m[2]; }
+            if(ri===0){ d=m[2];mo=m[3];y=m[4]; }       // DD/MM/YYYY
+            else if(ri===1){ d=m[1];mo=m[2];y=m[3]; }  // DD MM YYYY
+            else{ d=String(m[1]).padStart(2,'0');mo='01';y=m[2]; } // texto mes
             if(y&&y.length===2) y='20'+y;
-            const dt=new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
+            const dt=new Date(`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
             if(!isNaN(dt)) date=dt.toISOString().slice(0,10);
           }catch{}
         }
@@ -384,21 +388,22 @@ function parseTicketText(text){
   // ── Detectar total global ─────────────────────────────────────
   let total=0;
   // Buscar IMPORTE: / TOTAL A PAGAR / ART. TOTAL / ==== seguido de precio
-  const TOTAL_TRIGGER_RX=/^(total\s*a\s*pagar|art\.?[\s.]*total|====+|\*?total\b)/i;
+  const TOTAL_TRIGGER_RX=/^(\*total\b|total\s+a\s+pagar|art\.?[\s.]*total|====+)/i; // NO bare 'total' (es cabecera IVA en Froiz)
   for(let ti=0;ti<lines.length;ti++){
     const l=lines[ti].trim();
     // Precio inline en la misma línea: "IMPORTE: 11,82 EUR"
     const inlineTotal=l.match(/(?:importe?|\*?total|imp\.|entrega:)[^0-9]*(\d{1,4}[.,]\d{2})\s*(?:eur|€\.?)?/i);
     if(inlineTotal){ const v=parseFloat(inlineTotal[1].replace(',','.')); if(v>0){total=v;break;} }
     if(!TOTAL_TRIGGER_RX.test(l)) continue;
-    // Buscar precio en las siguientes líneas no vacías
-    for(let k=1;k<=4;k++){
+    // Buscar precio en las siguientes líneas — saltar texto intermedio (Entrega:, etc.)
+    for(let k=1;k<=6;k++){
       if(ti+k>=lines.length) break;
       const nxt=lines[ti+k].trim();
       if(!nxt||SEP_RX.test(nxt)) continue;
-      const nm=nxt.match(/^(\d{1,4}[.,]\d{2})\s*(?:eur|€)?$/i);
+      // Precio en la línea con o sin "Eur."
+      const nm=nxt.match(/^(\d{1,4}[.,]\d{2})\s*(?:eur|€)?\.?\s*$/i)||
+               nxt.match(/(?:entrega:|tarjetas:)[^0-9]*(\d{1,4}[.,]\d{2})/i);
       if(nm){ const v=parseFloat(nm[1].replace(',','.')); if(v>0){total=v;break;} }
-      if(!/^\d/.test(nxt)) break;
     }
     if(total) break;
   }
@@ -479,7 +484,11 @@ function parseTicketText(text){
   function parseFroiz(allLines, out){
     const FROIZ_CODE_RX=/^\d{5,}\.?\s*\d*$/;
     const FROIZ_CUT_RX=/^(\*?total\b|entrega:|tarjetas:|a\s+devolver|base\s+c\.iva)/i;
+    const PRICE_DECIMAL=/^\d{1,3}[.,]\d{2}$/;
+    function fp(t){const m=t.match(/^(\d{1,3}[.,]\d{2})/);return m?parseFloat(m[1].replace(',','.')):null;}
+    function isFrozPrice(t){return PRICE_DECIMAL.test(t);}
 
+    // Encontrar cabecera y corte
     let headerEnd=0;
     for(let i=0;i<allLines.length;i++){
       const l=allLines[i].trim();
@@ -492,85 +501,77 @@ function parseTicketText(text){
     }
     const body=allLines.slice(headerEnd,docEnd);
 
-    function isFroizName(l){
+    // ¿IMPORTE aparece antes o después de los nombres?
+    function isFrozName(l){
       if(!l||l.length<3) return false;
       if(FROIZ_CODE_RX.test(l)) return false;
-      if(isPrice(l)||isLidlPrice(l)) return false;
-      if(/^\d+$/.test(l)) return false;
-      if(/^\d+%$/.test(l)) return false;
-      // IMPORTE es cabecera de columna en Froiz, no filtrar nombres después de él
+      if(isFrozPrice(l)) return false;
+      if(/^\d+$/.test(l)||/^\d+%$/.test(l)) return false;
+      if(/^importe$/i.test(l)) return false;
       if(isSkip(l)||BARCODE_RX.test(l)||SEP_RX.test(l)) return false;
       if(/^(nif|cif|factura|simplificada|descripcion|cant|p\.v\.p)/i.test(l)) return false;
       return true;
     }
-
-    const names=body.filter(l=>isFroizName(l.trim()));
-    const prices=[];
-    // Detectar si IMPORTE aparece antes o después de los nombres
-    const firstNameIdx=body.findIndex(l=>isFroizName(l.trim()));
+    const names=body.filter(l=>isFrozName(l.trim()));
+    const firstNameIdx=body.findIndex(l=>isFrozName(l.trim()));
     const importeIdx=body.findIndex(l=>/^importe$/i.test(l.trim()));
-    const importeIsHeader=importeIdx>=0&&importeIdx<firstNameIdx; // IMPORTE antes de nombres → cabecera
-    // Para iPad: prices directamente tras código (antes de IMPORTE)
-    // Para iPhone: prices vienen en pares tras 4%: [pvp_unit, importe_total] — tomar el último
+    const importeIsHeader=importeIdx>=0&&importeIdx<firstNameIdx;
+
+    // Recoger precios
+    const prices=[]; // array de {unitP, qty}
+
     if(!importeIsHeader){
-      // iPad: tomar precios inmediatamente después de cada código interno
-      // No cortar en IMPORTE — puede haber productos después
-      let prevWasCode=false;
+      // iPad: precios vienen tras código interno, IVA después de IMPORTE
+      const unitPrices=[], ivaPrices=[];
+      let prevCode=false, pastImp=false;
       for(const l of body){
         const t=l.trim();
-        if(FROIZ_CODE_RX.test(t)){prevWasCode=true;continue;} // check code BEFORE bare integer
-        if(/^\d+%$/.test(t)||/^\d+$/.test(t)){prevWasCode=false;continue;}
-        if((isPrice(t)||isLidlPrice(t))&&prevWasCode){
-          const p=parseLidlPrice(t)||parsePrice(t);
-          if(p!=null&&p>0&&p<500) prices.push(p);
-          prevWasCode=false; continue;
+        if(/^importe$/i.test(t)){pastImp=true;prevCode=false;continue;}
+        if(FROIZ_CODE_RX.test(t)){prevCode=true;continue;}
+        if(/^\d+%$/.test(t)||(/^\d+$/.test(t)&&!FROIZ_CODE_RX.test(t))){prevCode=false;continue;}
+        if(isFrozPrice(t)){
+          const p=fp(t);
+          if(p!=null&&p>0&&p<500){
+            if(prevCode) unitPrices.push(p);
+            else if(pastImp) ivaPrices.push(p);
+          }
+          prevCode=false;
+        } else { prevCode=false; }
+      }
+      for(let k=0;k<unitPrices.length;k++){
+        const unitP=unitPrices[k];
+        const ivaP=ivaPrices[k];
+        if(ivaP&&unitP>0){
+          const qty=Math.round(ivaP/unitP);
+          if(qty>1&&qty<=50&&Math.abs(qty*unitP-ivaP)<0.02) prices.push({unitP,qty});
+          else prices.push({unitP,qty:1});
+        } else {
+          prices.push({unitP,qty:1});
         }
-        if(isPrice(t)||isLidlPrice(t)){prevWasCode=false;continue;} // precio no tras código → ignorar
-        prevWasCode=false;
       }
     } else {
-      // iPhone Froiz: precios vienen agrupados por tipo IVA
-      // Cada grupo de IVA puede tener 1 o 2 precios: [pvp_unit, total_pagado]
-      // Si hay 2 precios en el grupo, el segundo es el total (pack).
-      // Estructura: 4% → p1a, p1b → 4% → p2a, p2b → 10% → p3a, p3b
-      // O sin agrupación clara: contar cuántos nombres hay y tomar esa cantidad de precios
-      // en el orden correcto desde el bloque de precios.
-      // Estrategia: recoger TODOS los precios en orden y tomar 1 por nombre,
-      // eligiendo el total (2º si hay par consecutivo con mismo tipo, o el más grande)
-      const allPrices=[];
+      // iPhone: precios vienen agrupados por tipo IVA [pvp_unit?, total_pagado]
+      const allP=[];
       for(const l of body){
         const t=l.trim();
-        if(/^\d+%$/.test(t)) continue; // separador de IVA
-        if(isPrice(t)||isLidlPrice(t)){
-          const p=parseLidlPrice(t)||parsePrice(t);
-          if(p!=null&&p>0&&p<500) allPrices.push(p);
-        }
+        if(/^\d+%$/.test(t)) continue;
+        if(isFrozPrice(t)){const p=fp(t);if(p!=null&&p>0&&p<500)allP.push(p);}
       }
-      // allPrices para el ejemplo: [1.89, 1.89, 1.19, 7.14, 3.69, 3.69]
-      // Necesitamos names.length precios, uno por nombre
-      // Patrón: cuando hay un precio duplicado consecutivo, usar uno. Cuando hay par diferente, usar el mayor.
-      const deduped=[];
+      // Deduplicar: pares [pvp, total] → tomar total si es diferente y mayor
       let ai=0;
-      while(ai<allPrices.length&&deduped.length<names.length){
-        const current=allPrices[ai];
-        const next=allPrices[ai+1];
-        if(next!==undefined&&next!==current&&next>current){
-          // Par diferente: pvp_unit + total_pagado → tomar el total
-          deduped.push(next); ai+=2;
-        } else if(next!==undefined&&next===current){
-          // Precio duplicado: tomar una vez
-          deduped.push(current); ai+=2;
-        } else {
-          deduped.push(current); ai++;
-        }
+      while(ai<allP.length&&prices.length<names.length){
+        const cur=allP[ai], nxt=allP[ai+1];
+        if(nxt!==undefined&&nxt!==cur&&nxt>cur){prices.push({unitP:cur,qty:Math.round(nxt/cur)||1});ai+=2;}
+        else if(nxt!==undefined&&nxt===cur){prices.push({unitP:cur,qty:1});ai+=2;}
+        else{prices.push({unitP:cur,qty:1});ai++;}
       }
-      deduped.forEach(p=>prices.push(p));
     }
 
+    // Parear nombres con precios
     for(let k=0;k<names.length;k++){
       const rawName=names[k].trim().replace(/\s+\d+[.,]?\d*\s*%\s*$/,'').trim();
-      const price=prices[k];
-      if(!price) continue;
+      const pe=prices[k];
+      if(!pe) continue;
       const nm=cleanName(rawName)
         .replace(/\s+\d+\s*u\b/gi,'')
         .replace(/\s+\d+[.,]\d+\s*(kg|g|l|ml|cl)\b/gi,'')
@@ -578,225 +579,7 @@ function parseTicketText(text){
         .replace(/\bbrik\s+\d+(\s+\d+)?\b/gi,'brik')
         .replace(/\s+\d+\s*$/,'').trim();
       if(nm.length<2) continue;
-      out.push(makeProduct(nm,rawName,price,1));
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  FORMATO CARREFOUR — estructura confirmada:
-  //    NOMBRE           ← nombre del producto
-  //    N x (            ← bloque: cantidad N
-  //    P,PP)            ← precio unitario
-  //    TOTAL            ← precio total bloque (consumir/descartar)
-  //
-  //  Items unitarios (sin bloque qty):
-  //    NOMBRE
-  //    P,PP
-  // ═══════════════════════════════════════════════════════════════
-  function parseCarrefour(pLines, out){
-    let i=0;
-    while(i<pLines.length){
-      const trimmed=pLines[i].trim(); i++;
-      if(!trimmed||trimmed.length<2) continue;
-      if(isSkip(trimmed)) continue;
-      if(BARCODE_RX.test(trimmed)||SEP_RX.test(trimmed)) continue;
-      if(/^\d{1,2}[\/.:]\d{2}/.test(trimmed)) continue;
-      if(/^\d{1,3}$/.test(trimmed)) continue; // número de artículos (ej: "8", "55")
-
-      // ── Bloque qty "N x (" (multilínea) o "N x ( P,PP )" (una línea) ──────────────────────────────────────
-      // El nombre YA está en out como último elemento (procesado justo antes).
-      // Actualizamos ese último elemento con qty y unitPrice correctos.
-      const qtyInlineM=trimmed.match(QTY_INLINE_RX); // "3 x ( 1,29 )" en una sola línea
-      if(qtyInlineM){
-        const unitPrice=parseFloat(qtyInlineM[2].replace(',','.'));
-        // Inferir qty: si la siguiente línea es el precio total, qty = total / unitPrice
-        let qty=parseInt(qtyInlineM[1])||1;
-        if(i<pLines.length&&isPrice(pLines[i].trim())){
-          const blockTotal=parsePrice(pLines[i].trim());
-          const inferred=Math.round(blockTotal/unitPrice);
-          if(inferred>=1&&inferred<=20&&Math.abs(inferred*unitPrice-blockTotal)<0.02) qty=inferred;
-          i++; // consumir precio total
-        }
-        if(out.length>0){
-          const last=out[out.length-1];
-          last.qty=qty; last.unitPrice=unitPrice; last.price=unitPrice;
-          last.finalPrice=parseFloat((unitPrice*qty).toFixed(2));
-        }
-        continue;
-      }
-      const qtyM=trimmed.match(QTY_OPEN_RX); // "3 x (" multilínea
-      if(qtyM){
-        const qty=parseInt(qtyM[1]);
-        // Leer precio unitario "1,29)"
-        let unitPrice=null;
-        if(i<pLines.length&&isPrice(pLines[i].trim())){
-          unitPrice=parsePrice(pLines[i].trim()); i++;
-        }
-        // Consumir precio total del bloque "3,87"
-        if(i<pLines.length&&isPrice(pLines[i].trim())) i++;
-        if(!unitPrice) continue;
-        // Parchear el último producto añadido
-        if(out.length>0){
-          const last=out[out.length-1];
-          last.qty=qty; last.unitPrice=unitPrice; last.price=unitPrice;
-          last.finalPrice=parseFloat((unitPrice*qty).toFixed(2));
-        }
-        continue;
-      }
-
-      // ── Precio suelto → busca el primer producto sin precio (de atrás hacia adelante) ──
-      if(isPrice(trimmed)){
-        const pr=parsePrice(trimmed);
-        // Buscar hacia atrás el primer producto sin precio asignado aún
-        for(let k=out.length-1;k>=Math.max(0,out.length-4);k--){
-          const target=out[k];
-          if(!target.unitPrice||target.unitPrice===0){
-            if(/art.*total|total.*pagar/i.test(target.rawName||'')){out.splice(k,1);break;}
-            target.unitPrice=pr; target.price=pr;
-            target.finalPrice=parseFloat((pr*(target.qty||1)).toFixed(2));
-            break;
-          }
-        }
-        continue;
-      }
-
-      // ── Nombre inline con precio (NOMBRE   1,59) ─────────────────
-      const inlineM=trimmed.match(INLINE_RX);
-      if(inlineM){
-        const rawName=inlineM[1].trim();
-        const pr=parseFloat(inlineM[2].replace(',','.'));
-        if(pr>0&&pr<=500&&rawName.length>=2&&!isSkip(rawName)){
-          const nm=cleanName(rawName);
-          if(nm.length>=2) out.push(makeProduct(nm,rawName,pr,1));
-        }
-        continue;
-      }
-
-      // ── Nombre solo ──────────────────────────────────────────────
-      if(!isKgInfo(trimmed)&&!WEIGHT_RX.test(trimmed)){
-        // Doble filtro: rechazar líneas que parezcan totales aunque lleguen aquí
-        if(/art.*total|total.*pagar/i.test(trimmed)) continue;
-        const nm=cleanName(trimmed);
-        if(nm.length>=2) out.push(makeProduct(nm,trimmed,0,1));
-      }
-    }
-    // Eliminar productos que no recibieron precio
-    for(let k=out.length-1;k>=0;k--){
-      if(!out[k].unitPrice||out[k].unitPrice===0) out.splice(k,1);
-    }
-  }
-
-
-  function parseLidlPrice(l){
-    const m=l.match(/^(\d{1,3}[.,]\d{2})\s*[A-Z]?\s*$/);
-    return m?parseFloat(m[1].replace(',','.')):null;
-  }
-  function isLidlPrice(l){return LIDL_PRICE_RX.test(l)||isPrice(l);}
-
-  // ══════════════════════════════════════════════════════════════
-  //  FORMATO LIDL COLUMNAS (OCR real iPad/WhatsApp)
-  //
-  //  El OCR de Vision en iPad separa el ticket en dos bloques:
-  //  BLOQUE A (antes de TOTAL): nombres de producto + info kg + packs
-  //  BLOQUE B (después de IMP./EUR/ooo): precios con sufijo B/A
-  //
-  //  Estructura confirmada del OCR real:
-  //    NOMBRE1, NOMBRE2... GOFRES, 2,49x, 2, PIÑA, 1,718 kg x 1,89, EUR/kg
-  //    TOTAL, ENTREGA, [basura OCR], IMP. 18,72 EUR, [más basura]
-  //    ooo / EUR / 82 / [basura]
-  //    1,15 B, 1,75 B ... 4,98 B, 3,25 A
-  //    18,72, 18,72
-  //
-  //  Pack detectado por: NOMBRE seguido de "P,PPx" y luego un número entero
-  //  Fruta por: NOMBRE seguido de "N,NNN kg x P,PP" y "EUR/kg"
-  // ══════════════════════════════════════════════════════════════
-  function parseLidlColumns(pLines, allLines, out){
-    // Recoger nombres y sus metadatos (pack qty, kg info)
-    const entries=[]; // {raw, qty, unitPrice, kgInfo}
-    let i=0;
-
-    // Buscar fin del bloque de nombres (TOTAL o ENTREGA)
-    const totalIdx=pLines.findIndex(l=>/^(total|entrega)$/i.test(l.trim()));
-    const nameLines=totalIdx>=0?pLines.slice(0,totalIdx):pLines;
-
-    let j=0;
-    // Saltar cabecera buscando NIF como ancla de inicio de productos
-    {
-      let nifIdx=nameLines.findIndex(l=>/^nif\b/i.test(l.trim()));
-      if(nifIdx>=0) j=nifIdx+1;
-    }
-    while(j<nameLines.length){
-      const l=nameLines[j].trim(); j++;
-      if(!l||isSkip(l)||BARCODE_RX.test(l)||SEP_RX.test(l)) continue;
-      if(/^\d{1,2}[\/.:]\d{2}/.test(l)) continue;
-      if(/^(nif|cif|eur\/kg|eur$|entrega|recibo|inicio|folletos|mi\s+cuenta|lidl\s+plus)/i.test(l)) continue;
-      if(/calle|avda|plaza|\d{5}/.test(l)) continue;
-      if(/s\.a\.u?\.?$|s\.l\.$/i.test(l)) continue;
-      if(store&&l.toLowerCase().includes(store.toLowerCase())) continue;
-      if(/^(lidl|aldi|dia|mercadona|carrefour)$/i.test(l)) continue;
-      if(/^\d+$/.test(l)) continue;
-      if(/^(ooo|82$|'|")/i.test(l)) continue;
-      if(/^\d+\s+de\s+/i.test(l)||/^(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(l)) continue;
-      if(LIDL_PRICE_RX.test(l)||UNIT_PRICE_X_RX.test(l)) continue;
-      if(isPrice(l)) continue;
-
-      // Detectar info de kg: siguiente línea es "N,NNN kg x P,PP"
-      let kgInfo=null;
-      if(j<nameLines.length&&MULT_RX.test(nameLines[j].trim())){
-        kgInfo=nameLines[j].trim(); j++;
-        // Consumir "EUR/kg" si sigue
-        if(j<nameLines.length&&/^eur\/kg/i.test(nameLines[j].trim())) j++;
-      }
-
-      // Detectar pack: siguiente línea es "P,PPx" + número entero
-      let packQty=1, packUnit=null;
-      if(j<nameLines.length&&UNIT_PRICE_X_RX.test(nameLines[j].trim())){
-        const upm=nameLines[j].trim().match(/^(\d{1,3}[.,]\d{2})/);
-        packUnit=upm?parseFloat(upm[1].replace(',','.')):null;
-        j++;
-        if(j<nameLines.length&&/^\d+$/.test(nameLines[j].trim())){
-          packQty=parseInt(nameLines[j].trim()); j++;
-        }
-      }
-
-      entries.push({raw:l, qty:packQty, unitPrice:packUnit, kgInfo});
-    }
-
-    // Recoger precios del bloque B (después de TOTAL en allLines)
-    // Buscar el bloque de precios: aparecen agrupados con sufijo B/A
-    // Pueden estar después de "ooo", "EUR", basura OCR
-    const prices=[];
-    let inPriceBlock=false;
-    for(const l of allLines){
-      const t=l.trim();
-      if(LIDL_PRICE_RX.test(t)){
-        const p=parseLidlPrice(t);
-        if(p!==null&&p>0) prices.push(p);
-        inPriceBlock=true;
-      } else if(inPriceBlock&&isPrice(t)){
-        // Precio sin sufijo B/A después del bloque (total del ticket)
-        break;
-      } else if(inPriceBlock&&t&&!/^(18|ooo|eur|82|'|\d{1,2}$)/i.test(t)){
-        // Línea de texto real — fin del bloque de precios
-        inPriceBlock=false;
-      }
-    }
-
-    // Parear entradas con precios
-    for(let k=0;k<entries.length;k++){
-      const e=entries[k];
-      const price=prices[k];
-      if(price==null) continue;
-      const nm=cleanName(e.raw);
-      if(nm.length<2) continue;
-      if(e.kgInfo){
-        // Fruta/verdura: 1 unidad al precio total
-        out.push(makeProduct(nm,e.raw,price,1));
-      } else if(e.qty>1&&e.unitPrice){
-        out.push(makeProduct(nm,e.raw,e.unitPrice,e.qty));
-      } else {
-        out.push(makeProduct(nm,e.raw,price,1));
-      }
+      out.push(makeProduct(nm,rawName,pe.unitP,pe.qty));
     }
   }
 
@@ -1899,16 +1682,48 @@ function copyLastOCR(){
   navigator.clipboard.writeText(raw).then(()=>showToast('OCR copiado ✓')).catch(()=>showToast('Error al copiar'));
 }
 function consultVisionUsage(){
-  if(!confirm('Esta acción hace una petición real a Google Cloud Vision para verificar el estado de la cuota.\n\nSolo necesitas pulsarlo si tienes dudas sobre el contador local.\n\nPulsa Cancelar si no es necesario ahora.')){return;}
-  // Google Cloud no tiene endpoint público para consultar uso sin OAuth completo.
-  // El contador local es la fuente más fiable para uso en PWA.
-  showToast('El contador local es el registro más preciso disponible desde una PWA');
+  openModal(`<div class="modal-title">Verificar uso de Vision</div>
+    <p style="font-size:14px;color:var(--txt1);line-height:1.6;margin:12px 0">
+      Esta acción hace una llamada real a Google Cloud Vision para verificar la cuota.
+      Solo es necesario si dudas del contador local.
+    </p>
+    <p style="font-size:13px;color:var(--txt2);line-height:1.5;margin-bottom:16px">
+      Google Cloud no ofrece un endpoint de consulta de uso accesible desde una PWA sin autenticación OAuth completa. El contador local es la fuente más fiable.
+    </p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-primary" style="flex:1" onclick="closeModal()">Entendido</button>
+    </div>`);
 }
 function consultGroqUsage(){
-  if(!confirm('Esta acción hace una petición real a Groq para verificar el estado de tu cuenta.\n\nEl contador local ya refleja tu uso desde esta app.\n\nPulsa Cancelar si no es necesario ahora.')){return;}
   if(!DB.groqKey){showToast('Configura primero tu Groq Key');return;}
-  // Groq no expone endpoint de uso por API key sin dashboard OAuth.
-  showToast('El contador local es el registro más preciso disponible desde una PWA');
+  openModal(`<div class="modal-title">Verificar uso de Groq</div>
+    <p style="font-size:14px;color:var(--txt1);line-height:1.6;margin:12px 0">
+      Esta acción hace una llamada real a Groq.
+      Solo es necesario si dudas del contador local.
+    </p>
+    <p style="font-size:13px;color:var(--txt2);line-height:1.5;margin-bottom:4px">
+      Groq no expone estadísticas de uso por API key sin acceso al dashboard. El contador local refleja todas las llamadas hechas desde esta app.
+    </p>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" style="flex:2" onclick="closeModal();doGroqUsageCheck()">Consultar de todas formas</button>
+    </div>`);
+}
+async function doGroqUsageCheck(){
+  if(!DB.groqKey){showToast('Sin API key');return;}
+  showToast('Consultando...');
+  try{
+    // Minimal call to get token usage info from response
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+DB.groqKey},
+      body:JSON.stringify({model:'llama-3.1-8b-instant',messages:[{role:'user',content:'1'}],max_tokens:1})
+    });
+    const d=await res.json();
+    if(d.usage) showToast('Tokens en esta llamada: '+d.usage.total_tokens+' · Ver panel Groq para uso total');
+    else if(d.error) showToast('Error Groq: '+d.error.message);
+    else showToast('Conexión OK · Usa el panel de Groq.com para el total');
+  }catch(e){showToast('Error de red: '+e.message);}
 }
 function addPerson(){const idx=DB.persons.length;DB.persons.push({id:'p'+(idx+1),name:'Persona '+(idx+1),color:PRESET_COLORS[idx%PRESET_COLORS.length],cards:[]});saveDB();renderSettings();editPerson(idx);}
 function editPerson(idx){
