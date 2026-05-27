@@ -32,7 +32,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent)}
   animation:logoPop .5s cubic-bezier(.34,1.56,.64,1) both;
   overflow:hidden;
 }
-#splash-logo{width:80px;height:80px;object-fit:contain;filter:invert(1) brightness(0.65);}
+#splash-logo{width:80px;height:80px;object-fit:contain;filter:invert(1) brightness(0.87) saturate(0.15) hue-rotate(210deg);}
 @keyframes logoPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
 .splash-title{font-size:32px;font-weight:800;letter-spacing:-1px;color:#d7dae5}
 .splash-sub{font-size:14px;color:var(--txt2);letter-spacing:.2px}
