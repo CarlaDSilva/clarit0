@@ -170,14 +170,52 @@ function finishSetup(){saveDB();document.getElementById('setup-screen').style.di
 
 // ── IMAGE RESIZE ────────────────────────────────────────────────
 // Escala a max 1000px, para OCR.space preferimos JPEG limpio y claro
+// Lee orientación EXIF del fichero (para corregir fotos Live/HEIC rotadas)
+function readExifOrientation(file){
+  return new Promise(res=>{
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const v=new DataView(e.target.result);
+        if(v.getUint16(0)!==0xFFD8){res(1);return;} // no JPEG
+        let off=2;
+        while(off<v.byteLength){
+          const marker=v.getUint16(off);off+=2;
+          const len=v.getUint16(off);
+          if(marker===0xFFE1){ // APP1 — EXIF
+            if(v.getUint32(off+2)===0x45786966){ // "Exif"
+              const tiffOff=off+2+6;
+              const le=v.getUint16(tiffOff)===0x4949;
+              const ifdOff=tiffOff+(le?v.getUint32(tiffOff+4,le):v.getUint32(tiffOff+4,false));
+              const entries=le?v.getUint16(ifdOff,le):v.getUint16(ifdOff,false);
+              for(let i=0;i<entries;i++){
+                const tag=v.getUint16(ifdOff+2+i*12,le);
+                if(tag===0x0112){res(v.getUint16(ifdOff+2+i*12+8,le));return;}
+              }
+            }
+          }
+          off+=len;
+        }
+      }catch{}
+      res(1);
+    };
+    r.readAsArrayBuffer(file.slice(0,64*1024));
+  });
+}
+
 function resizeForOCR(file){
-  return new Promise((res,rej)=>{
+  return new Promise(async(res,rej)=>{
+    // Leer orientación EXIF primero (fotos Live de iPhone vienen rotadas)
+    const orient=await readExifOrientation(file).catch(()=>1);
     const url=URL.createObjectURL(file);
     const img=new Image();
     img.onload=()=>{
       URL.revokeObjectURL(url);
-      const MAX=1000;
-      let w=img.naturalWidth,h=img.naturalHeight;
+      const MAX=1600; // más resolución = mejor OCR en texto pequeño
+      let sw=img.naturalWidth,sh=img.naturalHeight;
+      // Para orientaciones 5-8 ancho y alto se intercambian
+      const swapped=orient>=5&&orient<=8;
+      let w=swapped?sh:sw, h=swapped?sw:sh;
       if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
       else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
       const c=document.createElement('canvas');
@@ -185,17 +223,28 @@ function resizeForOCR(file){
       const ctx=c.getContext('2d');
       ctx.fillStyle='#fff';
       ctx.fillRect(0,0,w,h);
-      ctx.drawImage(img,0,0,w,h);
+      // Aplicar transformación EXIF antes de dibujar
+      ctx.save();
+      if(orient===2){ctx.transform(-1,0,0,1,w,0);}
+      else if(orient===3){ctx.transform(-1,0,0,-1,w,h);}
+      else if(orient===4){ctx.transform(1,0,0,-1,0,h);}
+      else if(orient===5){ctx.transform(0,1,1,0,0,0);}
+      else if(orient===6){ctx.transform(0,1,-1,0,h,0);}
+      else if(orient===7){ctx.transform(0,-1,-1,0,h,w);}
+      else if(orient===8){ctx.transform(0,-1,1,0,0,w);}
+      const dw=swapped?h:w, dh=swapped?w:h;
+      ctx.drawImage(img,0,0,dw,dh);
+      ctx.restore();
       // Aumentar contraste para mejor OCR
       const id=ctx.getImageData(0,0,w,h);
       const d=id.data;
       for(let i=0;i<d.length;i+=4){
         const g=Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
-        const v=Math.min(255,Math.max(0,Math.round((g-128)*1.4+128)));
+        const v=Math.min(255,Math.max(0,Math.round((g-128)*1.5+128)));
         d[i]=d[i+1]=d[i+2]=v;
       }
       ctx.putImageData(id,0,0);
-      res(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+      res(c.toDataURL('image/jpeg',0.9).split(',')[1]);
     };
     img.onerror=()=>rej(new Error('No se pudo cargar la imagen'));
     img.src=url;
@@ -762,7 +811,21 @@ function getEmptyTicket(){
 document.getElementById('file-input').addEventListener('change',function(){if(this.files[0])processFile(this.files[0]);this.value='';});
 document.getElementById('camera-input').addEventListener('change',function(){if(this.files[0])processFile(this.files[0]);this.value='';});
 function triggerCamera(){document.getElementById('camera-input').click();}
-function triggerFileGallery(){const inp=document.getElementById('file-input');inp.accept='image/jpeg,image/png,image/heic,image/webp,image/gif';inp.click();}
+function triggerFileGallery(){
+  // En iOS, para abrir directamente la fototeca (sin menú) necesitamos un input
+  // con accept="image/*" sin capture, creado dinámicamente en el contexto del click
+  const tmp=document.createElement('input');
+  tmp.type='file';
+  tmp.accept='image/jpeg,image/png,image/heic,image/heif,image/webp';
+  // Sin atributo capture → iOS abre fototeca directamente (en algunos casos)
+  tmp.style.cssText='position:fixed;top:-9999px;opacity:0';
+  document.body.appendChild(tmp);
+  tmp.addEventListener('change',function(){
+    if(this.files[0]) processFile(this.files[0]);
+    document.body.removeChild(tmp);
+  });
+  tmp.click();
+}
 
 // ── HOME ───────────────────────────────────────────────────────
 function renderHome(){
@@ -912,8 +975,8 @@ function renderTicketEditor(){
         <div class="card" style="margin:0 0 12px">
           <div class="field-row"><label class="field-label">Supermercado</label><input value="${t.store||''}" placeholder="Ej: Mercadona" oninput="currentTicket.store=this.value"/></div>
           <div class="datetime-row">
-            <div><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" onchange="currentTicket.date=this.value"/></div>
-            <div><label class="field-label">Hora</label><input type="time" value="${t.time||''}" onchange="currentTicket.time=this.value"/></div>
+            <div><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" onchange="currentTicket.date=this.value" style="font-size:15px;text-align:left;-webkit-text-align:left"/></div>
+            <div><label class="field-label">Hora</label><input type="time" value="${t.time||''}" onchange="currentTicket.time=this.value" style="font-size:15px;text-align:left;-webkit-text-align:left"/></div>
           </div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Últimos 4 dígitos tarjeta</label><input value="${t.last4||''}" placeholder="4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:600"/></div>
@@ -1148,7 +1211,7 @@ function renderBalance(){
   document.getElementById('view').innerHTML=`
     <div class="screen-header"><h1>Balance</h1><p>Deudas y liquidaciones</p></div>
     ${amount<0.01
-      ?`<div class="balance-card"><div class="bc-owes" style="color:var(--green)">Cuentas al día</div><div class="bc-amount" style="font-size:28px">Sin deuda</div></div>`
+      ?`<div class="balance-card"><div class="bc-owes settled">Cuentas al día</div><div class="bc-amount" style="font-size:28px;color:var(--green)">Sin deuda</div></div>`
       :`<div class="balance-card"><div class="bc-owes">${personName(owes)} debe a ${creditor?.name}</div><div class="bc-amount">${fmt(amount)}</div></div>
         <button class="settle-btn" onclick="settleAccounts()">Cuentas saldadas</button>`}
     <div style="margin:0 16px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
@@ -1438,6 +1501,15 @@ async function sendAIMessage(){
   const msg=input.value.trim();if(!msg)return;
   input.value='';
   DB.aiConvMessages.push({role:'user',content:msg});renderAIChat();
+  // 🥚 Easter egg
+  if(/secreto/i.test(msg)){
+    setTimeout(()=>{
+      DB.aiConvMessages.push({role:'bot',content:'🤫 Psst... esta app fue creada con mucho amor de Carli para Dami 💚'});
+      saveDB();renderAIChat();
+      const msgs=document.getElementById('ai-messages');if(msgs)msgs.scrollTop=msgs.scrollHeight;
+    },600);
+    return;
+  }
 
   // Construir contexto detallado con datos reales
   const {paid,owes,amount}=calcBalance();
