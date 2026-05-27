@@ -360,7 +360,7 @@ function parseTicketText(text){
 
   // ── Cortar en línea de total / impuestos ──────────────────────
   // Todo lo que viene después de la primera línea de corte no es producto
-  const CUT_RX=/^(art\.?\s*total|total\s*a\s*pagar|tipo\s*$|====|base\s*$|cuota\s*$|8\s*$)/i;
+  const CUT_RX=/^(art\.?\s*total|total\s*a\s*pagar|tipo\s*$|====|base\s*$|cuota\s*$)/i;
   let cutIdx=lines.length;
   for(let ti=0;ti<lines.length;ti++){
     if(CUT_RX.test(lines[ti].trim())){cutIdx=ti;break;}
@@ -398,6 +398,7 @@ function parseTicketText(text){
       if(isSkip(trimmed)) continue;
       if(BARCODE_RX.test(trimmed)||SEP_RX.test(trimmed)) continue;
       if(/^\d{1,2}[\/.:]\d{2}/.test(trimmed)) continue;
+      if(/^\d{1,3}$/.test(trimmed)) continue; // número de artículos (ej: "8", "55")
 
       // ── Bloque qty "N x (" (multilínea) o "N x ( P,PP )" (una línea) ──────────────────────────────────────
       // El nombre YA está en out como último elemento (procesado justo antes).
