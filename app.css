@@ -5,7 +5,7 @@
   --brd:#2a2a32;
   --rad:14px;--rad-sm:8px;--rad-xs:5px;
   --accent:#7c6ef5;--accent2:#5a4fd4;
-  --green:#4a7c5f;--red:#e5534b;--amber:#f59e0b;--blue:#4a9eff;--pink:#fce7f3;
+  --green:#00b295;--red:#e5534b;--amber:#f59e0b;--blue:#4a9eff;--pink:#fce7f3;
 }
 html,body{height:100%;background:var(--bg0);color:var(--txt0);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;overflow:hidden}
 button{background:none;border:none;cursor:pointer;color:inherit;font-family:inherit}
@@ -168,9 +168,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 .te-footer{padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--brd);background:var(--bg1);display:flex;gap:10px}
 
 /* ── Date/time row — no overflow ── */
-.datetime-row{display:flex;gap:8px;margin-top:10px;width:100%}
-.datetime-row>div:first-child{flex:1;min-width:0}
-.datetime-row>div:last-child{flex:0 0 auto;width:110px}
+.datetime-row{display:flex;flex-direction:column;gap:6px;margin-top:10px;width:100%}
+.datetime-row>div{width:100%}
 .datetime-row input{font-size:13px;padding:6px 8px;width:100%;box-sizing:border-box;border-radius:var(--rad-sm)}
 
 /* ── OCR LOADING ── */
