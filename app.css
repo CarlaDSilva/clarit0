@@ -34,7 +34,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 }
 #splash-logo{width:80px;height:80px;object-fit:contain;filter:invert(1) brightness(0.65);}
 @keyframes logoPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
-.splash-title{font-size:32px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,#a78bfa,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.splash-title{font-size:32px;font-weight:800;letter-spacing:-1px;color:#d7dae5}
 .splash-sub{font-size:14px;color:var(--txt2);letter-spacing:.2px}
 
 /* ── LAYOUT ── */
@@ -91,7 +91,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 }
 .logo-wrap{display:flex;align-items:center;gap:12px;margin-bottom:4px}
 .logo-img{width:52px;height:52px;border-radius:16px;object-fit:cover}
-.logo-big{font-size:38px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-big{font-size:38px;font-weight:800;letter-spacing:-1px;color:#d7dae5}
 .setup-step{width:100%;max-width:400px}
 .setup-step h2{font-size:20px;font-weight:700;margin-bottom:6px}
 .setup-step p{font-size:14px;color:var(--txt1);margin-bottom:22px;line-height:1.5}
@@ -268,7 +268,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 .pred-detail{font-size:12px;color:var(--txt2);margin-top:2px}
 .pred-days{font-size:13px;font-weight:700;color:var(--amber)}
 .inv-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--brd)}
-.inv-bar-track{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.inv-bar-track{width:80px;flex:none;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
 .inv-bar-fill{height:100%;border-radius:3px}
 .inv-name{font-size:14px;flex-shrink:0;width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .inv-days{font-size:12px;color:var(--txt2);width:50px;text-align:right;flex-shrink:0}
