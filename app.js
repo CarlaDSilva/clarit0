@@ -21,6 +21,7 @@ const PRESET_COLORS = [
   '#eab308', // amarillo
   '#14b8a6', // turquesa
   '#e879b0', // rosa bebé
+  '#fce7f3', // rosa muy clarito
 ];
 
 let DB = {
@@ -269,24 +270,25 @@ function parseTicketText(text){
     if(date&&time) break;
   }
 
-  // ── Detectar total — solo busca línea con "TOTAL" explícito, no "entrega efectivo" ──
+  // ── Detectar total ──
   let total=0;
-  const totalRx=/^(?:total|importe\s*total|a\s*pagar)[^\d]*(\d+[.,]\d{2})/i;
-  // Buscar primero línea exacta de total
-  for(const l of [...lines].reverse()){
-    const m=l.match(totalRx);
-    if(m){total=parseFloat(m[1].replace(',','.'));break;}
-  }
-  // Fallback: buscar "TOTAL (€)" con precio en línea siguiente
-  if(!total){
-    for(let i=0;i<lines.length;i++){
-      if(/^total\s*[\(\€]?/i.test(lines[i])&&i+1<lines.length){
-        const m=lines[i+1].match(/(\d+[.,]\d{2})/);
-        if(m){total=parseFloat(m[1].replace(',','.'));break;}
-        const m2=lines[i].match(/(\d+[.,]\d{2})/);
-        if(m2){total=parseFloat(m2[1].replace(',','.'));break;}
-      }
+  // Buscar "TOTAL A PAGAR" / "TOTAL" / "IMPORTE" con precio en la misma linea o en la siguiente
+  const TOTAL_LINE_RX=/^(?:total\s*a\s*pagar|total|importe\s*total|importe\b|a\s*pagar)/i;
+  const PRICE_IN_LINE_RX=/(\d{1,4}[.,]\d{2})\s*(?:eur|EUR|\u20ac)?$/;
+  for(let ti=0;ti<lines.length;ti++){
+    const l=lines[ti].trim();
+    if(!TOTAL_LINE_RX.test(l)) continue;
+    const inlineM=l.match(PRICE_IN_LINE_RX);
+    if(inlineM){const v=parseFloat(inlineM[1].replace(',','.'));if(v>0){total=v;break;}}
+    for(let k=1;k<=3;k++){
+      if(ti+k>=lines.length) break;
+      const nxt=lines[ti+k].trim();
+      if(!nxt) continue;
+      const nm=nxt.match(/^(\d{1,4}[.,]\d{2})\s*(?:eur|EUR|\u20ac)?$/);
+      if(nm){const v=parseFloat(nm[1].replace(',','.'));if(v>0){total=v;break;}}
+      if(!/^\d/.test(nxt)) break;
     }
+    if(total) break;
   }
 
   // ── Detectar últimos 4 dígitos tarjeta ──
@@ -297,35 +299,29 @@ function parseTicketText(text){
   }
 
 // ── Detectar productos ──
-  // Cortar en la primera línea que sea TOTAL (con o sin texto después) o "TOTAL A PAGAR"
   let totalLineIdx=lines.length;
   for(let ti=0;ti<lines.length;ti++){
     if(/^total(\s|$|\s*a\s*pagar)/i.test(lines[ti].trim())){totalLineIdx=ti;break;}
   }
   const productLines=lines.slice(0,totalLineIdx);
 
-  const SKIP_RX=/^(subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[eé]f|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale|art\.\s*$|\d+,\d+%|\d+\.\d+%)/i;
+  const PROMO_RX=/^(-[A-ZÁÉÍÓÚÑ]|EL\s+CLUB\b|MI\s+DÍA|LLEGA\b)/i;
+  const SKIP_RX=/^(subtotal|iva|base\s*imp|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|imp\.\s*\(?€|secc|tel[ée]f|telf|telef|op:|pol\.|s\.a\.|a-\d|c\.i\.f|bienvenid|hasta\s*pronto|recib|cuota|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale|art\.\s*$|\d+,\d+%|\d+\.\d+%)/i;
   const PRICE_ONLY_RX=/^\s*(\d{1,3}[.,]\d{2})\s*€?\s*$/;
-  // Línea de cierre de bloque qty Carrefour: "1,59)" o "3,87)" — precio seguido de paréntesis
   const PAREN_CLOSE_RX=/^\d{1,3}[.,]\d{2}\)?\s*$/;
-  // Línea de apertura de bloque qty Carrefour: "3 x (" o "2 x ("
   const QTY_OPEN_RX=/^(\d+)\s*[xX]\s*\(/;
   const KG_INFO_RX=/\d+[.,]\d+\s*kg|€\/kg|eur\/kg|\d+[.,]\d+\s*[xX]\s*\d+[.,]\d+/i;
+  const WEIGHT_INFO_RX=/^[\d.,]+\s*(g|kg|ml|l|cl|lt?|gr?)\s*$/i;
   const INLINE_PRICE_RX=/^(.+?)\s+(\d{1,3}[.,]\d{2})\s*€?\s*$/;
   const QTY_PREFIX_RX=/^(\d+)\s+(.+)/;
-  // Barcode-only lines (8+ digits, no letters)
   const BARCODE_RX=/^\d{8,}$/;
 
   function cleanProductName(raw){
-    return raw
-      .replace(/\d+[.,]\d+\s*kg.*/i,'')
-      .replace(/\s*€\/kg.*/i,'')
-      .replace(/\s*€\/u.*/i,'')
-      .replace(/\)$/,'')
-      .trim();
+    return raw.replace(/\d+[.,]\d+\s*kg.*/i,'').replace(/\s*€\/kg.*/i,'').replace(/\s*€\/u.*/i,'').replace(/\)$/,'').trim();
   }
   function isPriceLine(l){return PRICE_ONLY_RX.test(l)||PAREN_CLOSE_RX.test(l);}
-  function isKgInfoLine(l){return KG_INFO_RX.test(l)&&!PRICE_ONLY_RX.test(l);}
+  function isKgInfoLine(l){return (KG_INFO_RX.test(l)||WEIGHT_INFO_RX.test(l))&&!PRICE_ONLY_RX.test(l);}
+  function isTechLine(l){return SKIP_RX.test(l)||PROMO_RX.test(l)||BARCODE_RX.test(l)||WEIGHT_INFO_RX.test(l);}
 
   const products=[];
   let i=0;
@@ -333,53 +329,109 @@ function parseTicketText(text){
     const line=productLines[i];
     i++;
     const trimmed=line.trim();
-    if(trimmed.length<2) continue;
-    if(SKIP_RX.test(trimmed)) continue;
-    if(BARCODE_RX.test(trimmed)) continue;
+    if(!trimmed||trimmed.length<2) continue;
+    if(isTechLine(trimmed)) continue;
     if(/^\d{1,2}\/\d{2}\/\d{2,4}/.test(trimmed)||/^\d{1,2}:\d{2}/.test(trimmed)) continue;
 
-    // ── Formato Carrefour qty: "3 x (\n1,29)\nNOMBRE\nNOMBRE\n3,87" ──
+    // ── Bloque Carrefour "N x (\nP,PP)" ──
+    // Carrefour agrupa items del mismo precio bajo un bloque qty.
+    // El nombre puede venir DESPUES del bloque (caso mayoritario).
+    // Estrategia: consumir el encabezado, recoger unitPrice, luego leer
+    // tantos nombres como qty indica, cada uno con su precio en linea siguiente.
     const qtyOpenM=trimmed.match(QTY_OPEN_RX);
     if(qtyOpenM){
       const qty=parseInt(qtyOpenM[1]);
-      // Consumir la línea de precio unitario "1,29)" si viene a continuación
+      // Leer precio unitario "1,29)" en la linea siguiente
       let unitPrice=null;
       if(i<productLines.length){
-        const nextL=productLines[i].trim();
-        const upm=nextL.match(/^(\d{1,3}[.,]\d{2})\)?$/);
+        const nu=productLines[i].trim();
+        const upm=nu.match(/^(\d{1,3}[.,]\d{2})\)?$/);
         if(upm){unitPrice=parseFloat(upm[1].replace(',','.'));i++;}
       }
-      // Consumir líneas de nombre hasta encontrar el precio total
-      const nameLines=[];
-      while(i<productLines.length){
+      // Saltar vacias
+      while(i<productLines.length&&!productLines[i].trim()) i++;
+
+      // Pre-escanear cuantos nombres hay en el bloque para decidir si usar qty por item o qty total
+      // Un bloque "3 x (1,29)" puede tener 1 nombre (mismo producto x3) o N nombres (N productos distintos)
+      let scanJ=i;
+      let nameCount=0;
+      while(scanJ<productLines.length&&nameCount<qty){
+        const sl=productLines[scanJ].trim();
+        if(!sl||isKgInfoLine(sl)){scanJ++;continue;}
+        if(sl.match(QTY_OPEN_RX)) break;
+        if(isPriceLine(sl)){scanJ++;break;} // precio del bloque
+        if(isTechLine(sl)){scanJ++;continue;}
+        nameCount++;scanJ++;
+        // Si hay precio inline, solo es 1 nombre
+        if(sl.match(INLINE_PRICE_RX)){/* ya contado */}
+      }
+      const oneNameForAll=(nameCount===1&&qty>1);
+
+      // Recoger hasta qty nombres con sus precios
+      let collected=0;
+      while(i<productLines.length&&collected<qty){
         const nl=productLines[i].trim();
-        if(isPriceLine(nl)||BARCODE_RX.test(nl)) break;
-        if(SKIP_RX.test(nl)){i++;continue;}
-        if(nl.length>=2) nameLines.push(nl);
-        i++;
+        if(!nl){i++;continue;}
+        if(nl.match(QTY_OPEN_RX)) break;
+        if(isTechLine(nl)){i++;continue;}
+        // Nombre inline con precio
+        const inM=nl.match(INLINE_PRICE_RX);
+        if(inM){
+          const nm=cleanProductName(inM[1].trim());
+          const pr=parseFloat(inM[2].replace(',','.'));
+          if(nm.length>=2&&pr>0){products.push(makeProduct(nm,inM[1].trim(),pr,1));collected++;}
+          i++;continue;
+        }
+        // Nombre sin precio
+        if(!isPriceLine(nl)&&!isKgInfoLine(nl)){
+          const rawName=nl;
+          i++;
+          while(i<productLines.length){
+            const sk=productLines[i].trim();
+            if(!sk||isKgInfoLine(sk)){i++;continue;}
+            break;
+          }
+          let pr2=unitPrice;
+          if(i<productLines.length){
+            const prL=productLines[i].trim();
+            if(isPriceLine(prL)){
+              const candidatePrice=parseFloat(prL.replace(/[)]/g,'').replace(',','.'));
+              const isBlockTotal=unitPrice&&Math.abs(candidatePrice-unitPrice*qty)<0.02;
+              if(!isBlockTotal){pr2=candidatePrice;i++;}
+            }
+          }
+          if(pr2&&rawName.length>=2){
+            const nm2=cleanProductName(rawName);
+            // Si hay un solo nombre para todo el bloque, asignar qty completa
+            const effectiveQty=oneNameForAll?qty:1;
+            if(nm2.length>=2){products.push(makeProduct(nm2,rawName,pr2,effectiveQty));collected+=effectiveQty;}
+          }
+          continue;
+        }
+        if(isPriceLine(nl)){i++;break;}
+        break;
       }
-      // Precio total en la línea siguiente (puede ser "3,87" o "3,87)")
-      let totalPrice=null;
-      if(i<productLines.length){
-        const tl=productLines[i].trim().replace(')','');
-        const tm=tl.match(/^(\d{1,3}[.,]\d{2})$/);
-        if(tm){totalPrice=parseFloat(tm[1].replace(',','.'));i++;}
-      }
-      if(!unitPrice&&totalPrice) unitPrice=parseFloat((totalPrice/qty).toFixed(2));
-      if(nameLines.length>0&&unitPrice){
-        const rawName=nameLines[0];
-        const name=cleanProductName(rawName);
-        if(name.length>=2) products.push(makeProduct(name,rawName,unitPrice,qty));
+      // Fallback si no se recogieron nombres
+      if(collected===0&&unitPrice){
+        let backName='';
+        for(let b=i-3;b>=Math.max(0,i-10);b--){
+          const bl=(productLines[b]||'').trim();
+          if(bl&&!isPriceLine(bl)&&!isTechLine(bl)&&!bl.match(QTY_OPEN_RX)&&bl.length>=2){backName=bl;break;}
+        }
+        if(backName){
+          const nm=cleanProductName(backName);
+          if(nm.length>=2) products.push(makeProduct(nm,backName,unitPrice,qty));
+        }
       }
       continue;
     }
 
-    // Formato inline: NOMBRE    1,45
+    // ── Formato inline: NOMBRE    1,45 ──
     const inlineM=line.match(INLINE_PRICE_RX);
     if(inlineM){
       const rawName=inlineM[1].trim();
       const price=parseFloat(inlineM[2].replace(',','.'));
-      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)&&!SKIP_RX.test(rawName)&&!isKgInfoLine(rawName)&&!BARCODE_RX.test(rawName)){
+      if(price>0&&price<=500&&rawName.length>=2&&!/^\d+$/.test(rawName)&&!isTechLine(rawName)){
         const qm=rawName.match(QTY_PREFIX_RX);
         const qty=qm?parseInt(qm[1]):1;
         const name=cleanProductName(qm?qm[2]:rawName);
@@ -391,13 +443,13 @@ function parseTicketText(text){
 
     if(isPriceLine(trimmed)||isKgInfoLine(trimmed)) continue;
 
-    // Formato Mercadona: nombre seguido de precios/kg en líneas siguientes
-    // También consume líneas vacías (ej: CALABACIN con línea en blanco antes del kg)
+    // ── Formato Mercadona: nombre + precio en lineas siguientes ──
     const priceLines=[];
     let j=i;
     while(j<productLines.length){
       const next=productLines[j].trim();
-      if(next.length===0){j++;continue;}
+      if(!next){j++;continue;}
+      if(next.match(QTY_OPEN_RX)) break;
       if(isPriceLine(next)){priceLines.push(parseFloat(next.replace(/[)]/g,'').replace(',','.').trim()));j++;}
       else if(isKgInfoLine(next)){j++;}
       else break;
@@ -407,7 +459,7 @@ function parseTicketText(text){
       i=j;
       const price=priceLines[priceLines.length-1];
       const rawName=trimmed;
-      if(SKIP_RX.test(rawName)||rawName.length<2) continue;
+      if(isTechLine(rawName)||rawName.length<2) continue;
       const qm=rawName.match(QTY_PREFIX_RX);
       const qty=qm?parseInt(qm[1]):1;
       const unitPrice=qty>1?parseFloat((price/qty).toFixed(2)):price;
