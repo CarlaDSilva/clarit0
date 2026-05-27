@@ -172,6 +172,9 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 .datetime-row>div{width:100%}
 .datetime-row input[type=date],.datetime-row input[type=time]{-webkit-appearance:none;appearance:none;font-family:inherit;font-size:15px;color:var(--txt0);background:var(--bg3);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:10px 14px;width:100%;box-sizing:border-box;text-align:left;display:block}
 .datetime-row input[type=date]:focus,.datetime-row input[type=time]:focus{border-color:var(--accent);outline:none}
+.datetime-row input[type=date]::-webkit-date-and-time-value,.datetime-row input[type=time]::-webkit-date-and-time-value{text-align:left}
+.datetime-row input[type=date]::-webkit-datetime-edit,.datetime-row input[type=time]::-webkit-datetime-edit{text-align:left;padding:0}
+.datetime-row input[type=date]::-webkit-datetime-edit-fields-wrapper,.datetime-row input[type=time]::-webkit-datetime-edit-fields-wrapper{padding:0}
 
 /* ── OCR LOADING ── */
 .ocr-loading{position:fixed;inset:0;z-index:300;background:rgba(13,13,15,.92);backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
