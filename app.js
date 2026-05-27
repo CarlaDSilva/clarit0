@@ -29,7 +29,8 @@ let DB = {
   ocrKey:'helloworld',
   visionKey:'',
   groqKey:'',
-  groqStats:{calls:0,lastReset:null,tokensUsed:0},
+  groqStats:{calls:0,firstCall:null,tokensUsed:0},
+  visionStats:{calls:0,firstCall:null},
   persons:[
     {id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},
     {id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}
@@ -46,6 +47,7 @@ function loadDB(){
   DB.visionKey=S.get('visionKey')||DB.visionKey||'';
   DB.groqKey=S.get('groqKey')||DB.groqKey||'';
   try{const gs=S.get('groqStats');if(gs)DB.groqStats=JSON.parse(gs);}catch{}
+  try{const vs=S.get('visionStats');if(vs)DB.visionStats=JSON.parse(vs);}catch{}
   if(!DB.knowledge) DB.knowledge={products:{},cards:{}};
   if(!DB.aiQuestions) DB.aiQuestions=[];
   if(!DB.aiConvMessages) DB.aiConvMessages=[];
@@ -317,7 +319,7 @@ function parseTicketText(text){
 
   // ── SKIP — líneas que nunca son productos ─────────────────────
   // Normas generales para todos los supermercados
-  const SKIP_RX=/^(subtotal|iva|base\s*imp|cuota|tipo\s*$|venta\s*$|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|debit|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|secc|tel[eé]f|telf|telef|op:|pol\.|s\.a\.|c\.i\.f|bienvenid|hasta\s*pronto|recib|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale|\d+[.,]\d+%|art\.?\s*total|centros\s+comerciales)/i;
+  const SKIP_RX=/^(subtotal|iva|base\s*imp|cuota|tipo\s*$|venta\s*$|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|debit|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|secc|tel[eé]f|telf|telef|op:|pol\.|s\.a\.|c\.i\.f|bienvenid|hasta\s*pronto|recib|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale|\d+[.,]\d+%|art\.?\s*total|centros\s+comerciales|^lidl$|^aldi$|^idl\)?)/i;
 
   // Líneas promocionales / publicitarias
   const PROMO_RX = /^(-[A-ZÁÉÍÓÚÑ]|EL\s+CLUB\b|MI\s+DÍA|LLEGA\b|CLUB\b$)/i;
@@ -603,7 +605,9 @@ function parseTicketText(text){
           // Excluir cabeceras de tienda (direcciones, NIFs, etc.)
           if(!/^\d/.test(t)&&t.length>=3&&!isKgInfo(t)&&!WEIGHT_RX.test(t)
              &&!isSkip(t)&&!/calle|avda|plaza|polg|\d{5}/i.test(t)
-             &&!/s\.a\.u?\.?$|s\.l\.$/i.test(t)){
+             &&!/s\.a\.u?\.?$|s\.l\.$/i.test(t)
+             &&!(store&&t.toLowerCase().includes(store.toLowerCase()))
+             &&!/^(lidl|aldi|dia|mercadona|carrefour|eroski|alcampo)$/i.test(t)){
             names.push({raw:t,_kgInfo:null});
           }
         } else {
@@ -777,10 +781,10 @@ async function callGroq(prompt){
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'Groq HTTP '+res.status);}
   const data=await res.json();
   // Rastrear uso de Groq
-  if(!DB.groqStats) DB.groqStats={calls:0,lastReset:null,tokensUsed:0};
+  if(!DB.groqStats) DB.groqStats={calls:0,firstCall:null,tokensUsed:0};
   DB.groqStats.calls=(DB.groqStats.calls||0)+1;
   DB.groqStats.tokensUsed=(DB.groqStats.tokensUsed||0)+(data.usage?.total_tokens||0);
-  if(!DB.groqStats.lastReset) DB.groqStats.lastReset=new Date().toISOString().slice(0,7);
+  if(!DB.groqStats.firstCall) DB.groqStats.firstCall=new Date().toISOString().slice(0,10);
   S.set('groqStats',JSON.stringify(DB.groqStats));
   return data.choices?.[0]?.message?.content||'';
 }
@@ -837,7 +841,13 @@ async function processFile(file){
     try{
       setOCRStatus('Leyendo ticket...');
       ocrText=await googleVisionExtract(b64);
-      console.log('OCR RAW:\n'+ocrText);
+      // Rastrear uso Vision localmente
+      if(!DB.visionStats) DB.visionStats={calls:0,firstCall:null};
+      DB.visionStats.calls=(DB.visionStats.calls||0)+1;
+      if(!DB.visionStats.firstCall) DB.visionStats.firstCall=new Date().toISOString().slice(0,10);
+      S.set('visionStats',JSON.stringify(DB.visionStats));
+      // Debug: guardar último OCR raw para diagnóstico
+      S.set('lastOCR',ocrText.slice(0,3000));
     }catch(ocrErr){
       console.warn('Google Vision falló:', ocrErr.message);
       setOCRStatus('Vision falló...');
@@ -862,7 +872,7 @@ async function processFile(file){
           if(groqResult.store) result.store=groqResult.store;
           if(groqResult.date) result.date=groqResult.date;
           if(groqResult.time) result.time=groqResult.time;
-          if(groqResult.total&&groqResult.total>0) result.total=typeof groqResult.total==='string'?parseFloat(groqResult.total.replace(',','.')):groqResult.total;
+          if(groqResult.total&&groqResult.total>0){const gt=typeof groqResult.total==='string'?parseFloat(groqResult.total.replace(',','.')):groqResult.total;if(gt>0)result.total=gt;}
           if(groqResult.last4&&!result.last4) result.last4=groqResult.last4; // no sobreescribir last4 local
           console.log('Groq mejoró a:', result.products.length, 'productos');
         }catch(groqErr){
@@ -1093,7 +1103,7 @@ function renderTicketEditor(){
             <div><label class="field-label">Fecha</label><input type="date" value="${t.date||''}" onchange="currentTicket.date=this.value" style="font-size:15px"/></div>
             <div><label class="field-label">Hora</label><input type="time" value="${t.time||''}" onchange="currentTicket.time=this.value" style="font-size:15px"/></div>
           </div>
-          <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total||''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
+          <div class="field-row" style="margin-top:10px"><label class="field-label">Total</label><input type="number" value="${t.total!=null?(+t.total).toFixed(2):''}" placeholder="0.00" step="0.01" oninput="currentTicket.total=parseFloat(this.value)||0"/></div>
           <div class="field-row" style="margin-top:10px"><label class="field-label">Últimos 4 dígitos tarjeta</label><input value="${t.last4||''}" placeholder="4821" maxlength="4" oninput="currentTicket.last4=this.value" style="letter-spacing:3px;font-weight:400"/></div>
         </div>
       </div>
@@ -1484,6 +1494,7 @@ function renderSettings(){
       <div class="settings-section-title">APIs</div>
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="editVisionKey()"><div class="settings-icon" style="background:#1a3a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h3M7 12h3M7 16h3M14 8h3M14 12h3M14 16h3"/></svg></div><div class="settings-label">Google Vision Key</div><div class="settings-value">${DB.visionKey?'•••'+DB.visionKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
+        ${DB.visionKey?('<div class="settings-row" onclick="showVisionStats()" style="cursor:pointer"><div class="settings-icon" style="background:#0a2a1a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/></svg></div><div class="settings-label">Uso de Vision</div><div class="settings-value">'+(DB.visionStats?.calls||0)+' lecturas</div><div class="settings-arrow">›</div></div>'):''}
         <div class="settings-row" onclick="editGroqKey()"><div class="settings-icon" style="background:#2a1a3a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="settings-label">Groq Key (chat IA)</div><div class="settings-value">${DB.groqKey?'•••'+DB.groqKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
         ${DB.groqKey?('<div class="settings-row" onclick="showGroqStats()" style="cursor:pointer"><div class="settings-icon" style="background:#1a2a3a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><polyline points=\'22 12 18 12 15 21 9 3 6 12 2 12\'/></svg></div><div class="settings-label">Uso de Groq</div><div class="settings-value">'+(DB.groqStats?.calls||0)+' llamadas · '+Math.round((DB.groqStats?.tokensUsed||0)/1000)+' k tokens</div><div class="settings-arrow">›</div></div>'):''}
       </div>
@@ -1555,31 +1566,65 @@ function deleteKnowledgeProduct(key){
   saveDB();
   editKnowledgeProducts(); // refresca el modal
 }
+function showVisionStats(){
+  const v=DB.visionStats||{};
+  const calls=v.calls||0;
+  const since=v.firstCall?'desde '+v.firstCall:'';
+  // Google Vision: 1000 lecturas/mes gratis, luego $1.50/1000
+  const free=1000;
+  const over=Math.max(0,calls-free);
+  const cost=(over/1000*1.50);
+  const freeLeft=Math.max(0,free-calls);
+  // Mostrar OCR debug del último ticket
+  const lastOCR=S.get('lastOCR')||'';
+  openModal(`<div class="modal-title">Uso de Vision IA</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0">
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px">
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:2px">Lecturas totales ${since}</div>
+        <div style="font-size:28px;font-weight:800">${calls}</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px;display:flex;gap:14px">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--txt2);margin-bottom:2px">Cuota gratis restante</div>
+          <div style="font-size:20px;font-weight:800;color:var(--green)">${freeLeft}</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--txt2);margin-bottom:2px">Gasto estimado</div>
+          <div style="font-size:20px;font-weight:800;color:${cost>0?'var(--amber)':'var(--green)'}">$${cost.toFixed(2)}</div>
+        </div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:12px">
+        <div style="font-size:11px;color:var(--txt2);line-height:1.6">1.000 lecturas/mes incluidas · Lectura adicional: $1,50/1.000</div>
+      </div>
+      ${lastOCR?`<div style="background:var(--bg3);border-radius:var(--rad-sm);padding:12px">
+        <div style="font-size:11px;color:var(--txt2);margin-bottom:6px">Último OCR recibido</div>
+        <pre style="font-size:10px;color:var(--txt1);white-space:pre-wrap;max-height:120px;overflow:auto;margin:0">${lastOCR.replace(/</g,'&lt;')}</pre>
+      </div>`:''}
+    </div>
+    <button class="btn-primary" onclick="closeModal()">Cerrar</button>`);
+}
 function showGroqStats(){
   const s=DB.groqStats||{};
   const calls=s.calls||0;
   const tokens=s.tokensUsed||0;
-  const month=s.lastReset||'—';
-  // Groq free tier: sin límite mensual, solo rate limit (30 req/min, 6000 tokens/min)
+  const since=s.firstCall?'desde '+s.firstCall:'';
   openModal(`<div class="modal-title">Uso de Groq IA</div>
-    <div style="display:flex;flex-direction:column;gap:14px;margin:16px 0">
-      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px">
-        <div style="font-size:12px;color:var(--txt2);margin-bottom:4px">Llamadas totales</div>
-        <div style="font-size:28px;font-weight:800">${calls}</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0">
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;color:var(--txt2);margin-bottom:2px">Llamadas totales ${since}</div>
+          <div style="font-size:28px;font-weight:800">${calls}</div>
+        </div>
       </div>
       <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px">
-        <div style="font-size:12px;color:var(--txt2);margin-bottom:4px">Tokens usados</div>
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:2px">Tokens usados</div>
         <div style="font-size:28px;font-weight:800">${(tokens/1000).toFixed(1)}k</div>
       </div>
-      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:14px">
-        <div style="font-size:12px;color:var(--txt2);margin-bottom:6px">Plan gratuito Groq</div>
-        <div style="font-size:13px;color:var(--txt1);line-height:1.5">Sin límite mensual de tokens. Rate limit: 30 llamadas/min y 6.000 tokens/min. El plan gratuito no caduca.</div>
+      <div style="background:var(--bg3);border-radius:var(--rad-sm);padding:12px">
+        <div style="font-size:12px;color:var(--txt2);line-height:1.6">Plan gratuito · Sin límite mensual · Rate limit: 30 req/min</div>
       </div>
     </div>
-    <div style="display:flex;gap:10px">
-      <button class="btn-secondary" style="flex:1" onclick="if(confirm('¿Resetear contadores?')){DB.groqStats={calls:0,lastReset:new Date().toISOString().slice(0,7),tokensUsed:0};saveDB();closeModal();renderSettings();}">Resetear</button>
-      <button class="btn-primary" style="flex:1" onclick="closeModal()">Cerrar</button>
-    </div>`);
+    <button class="btn-primary" onclick="closeModal()">Cerrar</button>`);
 }
 function addPerson(){const idx=DB.persons.length;DB.persons.push({id:'p'+(idx+1),name:'Persona '+(idx+1),color:PRESET_COLORS[idx%PRESET_COLORS.length],cards:[]});saveDB();renderSettings();editPerson(idx);}
 function editPerson(idx){
