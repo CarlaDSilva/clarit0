@@ -371,7 +371,7 @@ function parseTicketText(text){
   for(let ti=0;ti<lines.length;ti++){
     const l=lines[ti].trim();
     // Precio inline en la misma línea: "IMPORTE: 11,82 EUR"
-    const inlineTotal=l.match(/(?:importe|total)[^0-9]*(\d{1,4}[.,]\d{2})\s*(?:eur|€)?/i);
+    const inlineTotal=l.match(/(?:importe?|total|imp\.)[^0-9]*(\d{1,4}[.,]\d{2})\s*(?:eur|€)?/i);
     if(inlineTotal){ const v=parseFloat(inlineTotal[1].replace(',','.')); if(v>0){total=v;break;} }
     if(!TOTAL_TRIGGER_RX.test(l)) continue;
     // Buscar precio en las siguientes líneas no vacías
@@ -397,13 +397,12 @@ function parseTicketText(text){
   // ── Detectar tarjeta ─────────────────────────────────────────
   let last4=null;
   for(const l of lines){
-    const m=l.match(/[Xx]{4,}(\d{4})/)||           // XXXXXXXXXXXX0925
-             l.match(/[*•]{4,}\s*(\d{4})/)||        // ****0925
+    // Formatos de tarjeta enmascarada: "479343XXXXXX0925", "XXXXXXXXXXXX0925", "XXXXXXXXXXXX0925 00"
+    // Regla: debe haber al menos 4 X/*/• consecutivas seguidas de exactamente 4 dígitos al final
+    const m=l.match(/(?:\d{4,6})?[Xx*•]{4,}(\d{4})\b/)||   // "479343XXXXXX0925" o "XXXX0925"
+             l.match(/^[Xx\s*•]+(\d{4})\s*(?:\d{2})?\s*$/)||// "XXXX0925 00"
              l.match(/tarjeta[^\d]*(\d{4})/i)||
-             l.match(/VISA[^\d]*(\d{4})/i)||
-             l.match(/MASTERCARD[^\d]*(\d{4})/i)||
-             l.match(/DEBIT[^\d]*(\d{4})/i)||
-             l.match(/^[Xx\s*•]+(\d{4})\s*\d{2}\s*$/); // "XXXX0925 00" formato exacto
+             l.match(/(?:visa|mastercard|maestro|amex|debit)\s+\d*[Xx*•]+(\d{4})/i);
     if(m&&m[1]){ last4=m[1]; break; }
   }
 
@@ -416,6 +415,11 @@ function parseTicketText(text){
   }
   const productLines=lines.slice(0,cutIdx);
 
+  // ── Regexes específicos de formato Lidl ──────────────────────
+  const LIDL_PRICE_RX=/^(\d{1,3}[.,]\d{2})\s*[A-Z]\s*$/; // "1,15 B", "3,25 A"
+  const MULT_RX=/^[\d.,]+\s*(?:kg\s*)?[xX]\s*[\d.,]+/;   // "1,718 kg x 1,89"
+  const UNIT_PRICE_X_RX=/^(\d{1,3}[.,]\d{2})[xX]\s*$/;     // "2,49x"
+
   // ── PARSEAR PRODUCTOS ─────────────────────────────────────────
   const products=[];
 
@@ -427,7 +431,6 @@ function parseTicketText(text){
 
   return{store,date,time,last4,total,products,errors:[],warnings:[]};
 
-  // ═══════════════════════════════════════════════════════════════
   // ═══════════════════════════════════════════════════════════════
   //  FORMATO CARREFOUR — estructura confirmada:
   //    NOMBRE           ← nombre del producto
@@ -533,7 +536,76 @@ function parseTicketText(text){
   }
 
 
+  function parseLidlPrice(l){
+    const m=l.match(/^(\d{1,3}[.,]\d{2})\s*[A-Z]?\s*$/);
+    return m?parseFloat(m[1].replace(',','.')):null;
+  }
+  function isLidlPrice(l){return LIDL_PRICE_RX.test(l)||isPrice(l);}
+
   function parseGeneric(pLines, out){
+    // ── Detectar formato Lidl columnas (iPad/WhatsApp):
+    // nombres primero, luego TOTAL, luego precios con B/A ──
+    // Señal: hay bloque de líneas "X,XX B" o "X,XX A" después de TOTAL
+    const lidlPriceBlock=pLines.filter(l=>LIDL_PRICE_RX.test(l.trim()));
+    const hasLidlColumns=lidlPriceBlock.length>=3;
+
+    if(hasLidlColumns){
+      // Recoger nombres (antes del TOTAL) y precios (después del TOTAL/ENTREGA)
+      const names=[], prices=[];
+      let pastTotal=false;
+      for(const l of pLines){
+        const t=l.trim();
+        if(!t||t.length<2) continue;
+        if(/^(total|entrega|eur\/?kg?|eur$|2,49x|2,49\s*x)/i.test(t)){pastTotal=true;continue;}
+        if(BARCODE_RX.test(t)||SEP_RX.test(t)) continue;
+        if(isSkip(t)) continue;
+        if(MULT_RX.test(t)||UNIT_PRICE_X_RX.test(t)){
+          // Guardar info kg para el último nombre
+          if(names.length>0) names[names.length-1]._kgInfo=t;
+          continue;
+        }
+        if(!pastTotal){
+          // Antes del total: nombres de producto
+          // Excluir cabeceras de tienda (direcciones, NIFs, etc.)
+          if(!/^\d/.test(t)&&t.length>=3&&!isKgInfo(t)&&!WEIGHT_RX.test(t)
+             &&!isSkip(t)&&!/calle|avda|plaza|polg|\d{5}/i.test(t)
+             &&!/s\.a\.u?\.?$|s\.l\.$/i.test(t)){
+            names.push({raw:t,_kgInfo:null});
+          }
+        } else {
+          // Después del total: precios
+          const p=parseLidlPrice(t);
+          // Solo precios con decimales (no números enteros como "2" o "18")
+          if(p!==null&&p>0&&p<=500&&/[.,]\d{2}/.test(t)) prices.push(p);
+        }
+      }
+      // Parear nombres con precios por posición
+      if(names.length>0&&prices.length>0){
+        for(let k=0;k<names.length;k++){
+          const entry=names[k];
+          const price=prices[k];
+          if(!price) continue;
+          const nm=cleanName(entry.raw);
+          if(nm.length<2) continue;
+          // Si tiene info kg, es fruta/verdura — precio ya es el total
+          if(entry._kgInfo){
+            const kgM=entry._kgInfo.match(/^([\d.,]+)\s*kg\s*[xX]\s*([\d.,]+)/i);
+            if(kgM){
+              const kg=parseFloat(kgM[1].replace(',','.'));
+              const unitKg=parseFloat(kgM[2].replace(',','.'));
+              out.push(makeProduct(nm,entry.raw,unitKg,parseFloat(kg.toFixed(3))));
+            } else {
+              out.push(makeProduct(nm,entry.raw,price,1));
+            }
+          } else {
+            out.push(makeProduct(nm,entry.raw,price,1));
+          }
+        }
+        return;
+      }
+    }
+
+    // ── Formato genérico: inline o nombre+precio en líneas siguientes ──
     let i=0;
     while(i<pLines.length){
       const trimmed=pLines[i].trim(); i++;
@@ -541,14 +613,27 @@ function parseTicketText(text){
       if(isSkip(trimmed)) continue;
       if(BARCODE_RX.test(trimmed)||SEP_RX.test(trimmed)) continue;
       if(/^\d{1,2}[\/.:]\d{2}/.test(trimmed)) continue;
-      if(isPrice(trimmed)||isKgInfo(trimmed)) continue;
+      if(MULT_RX.test(trimmed)||UNIT_PRICE_X_RX.test(trimmed)) continue;
+      if(isKgInfo(trimmed)||WEIGHT_RX.test(trimmed)) continue;
 
-      // Inline: NOMBRE   PRECIO
+      // Lidl inline: "ZUMO MANZANA    1,15 B"
+      const lidlInlineM=trimmed.match(/^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*[A-Z]?\s*$/);
+      if(lidlInlineM){
+        const rawName=lidlInlineM[1].trim();
+        const price=parseFloat(lidlInlineM[2].replace(',','.'));
+        if(price>0&&price<=500&&rawName.length>=2&&!isSkip(rawName)&&!/^\d/.test(rawName)){
+          const nm=cleanName(rawName);
+          if(nm.length>=2) out.push(makeProduct(nm,rawName,price,1));
+        }
+        continue;
+      }
+
+      // Inline sin sufijo: NOMBRE   PRECIO
       const inlineM=trimmed.match(INLINE_RX);
       if(inlineM){
         const rawName=inlineM[1].trim();
         const price=parseFloat(inlineM[2].replace(',','.'));
-        if(price>0&&price<=500&&rawName.length>=2&&!isSkip(rawName)){
+        if(price>0&&price<=500&&rawName.length>=2&&!isSkip(rawName)&&!/^\d/.test(rawName)){
           const qm=rawName.match(/^(\d+)\s+(.+)/);
           const qty=qm?parseInt(qm[1]):1;
           const nm=cleanName(qm?qm[2]:rawName);
@@ -557,14 +642,17 @@ function parseTicketText(text){
         continue;
       }
 
-      // Nombre → buscar precio en líneas siguientes
+      if(isPrice(trimmed)||isLidlPrice(trimmed)) continue;
+      if(/^\d/.test(trimmed)) continue; // línea que empieza con número sin ser nombre
+
+      // Nombre → precio en líneas siguientes (Mercadona)
       const priceLines=[];
       let j=i;
       while(j<pLines.length){
         const next=pLines[j].trim();
         if(!next){j++;continue;}
-        if(isPrice(next)){priceLines.push(parsePrice(next));j++;}
-        else if(isKgInfo(next)||WEIGHT_RX.test(next)){j++;}
+        if(isPrice(next)||isLidlPrice(next)){priceLines.push(parseLidlPrice(next)||parsePrice(next));j++;}
+        else if(isKgInfo(next)||WEIGHT_RX.test(next)||MULT_RX.test(next)){j++;}
         else break;
       }
       if(priceLines.length>0){
@@ -737,8 +825,8 @@ async function processFile(file){
           if(groqResult.store) result.store=groqResult.store;
           if(groqResult.date) result.date=groqResult.date;
           if(groqResult.time) result.time=groqResult.time;
-          if(groqResult.total&&groqResult.total>0) result.total=groqResult.total;
-          if(groqResult.last4) result.last4=groqResult.last4;
+          if(groqResult.total&&groqResult.total>0) result.total=typeof groqResult.total==='string'?parseFloat(groqResult.total.replace(',','.')):groqResult.total;
+          if(groqResult.last4&&!result.last4) result.last4=groqResult.last4; // no sobreescribir last4 local
           console.log('Groq mejoró a:', result.products.length, 'productos');
         }catch(groqErr){
           console.warn('Groq fallback falló:', groqErr.message);
@@ -824,7 +912,7 @@ function renderHome(){
   document.getElementById('view').innerHTML=`
     <div class="screen-header">
       <div style="display:flex;align-items:flex-end;gap:12px">
-        <img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1)" onerror="this.style.display='none'"/>
+        <img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1) brightness(0.87) hue-rotate(210deg) saturate(0.3)" onerror="this.style.display='none'"/>
         <h1 style="padding-bottom:2px">Clarito</h1>
       </div>
     </div>
@@ -926,7 +1014,7 @@ function renderTickets(){
     <div class="screen-header"><h1>Tickets</h1><p>${tickets.length} registrados</p></div>
     <div class="upload-zone" onclick="triggerFileGallery()">
       <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3"/><polyline points="12 8 12 16"/><polyline points="8 12 12 8 16 12"/></svg>
-      <h3>Subir ticket desde galería</h3><p>Elige "Fotos" en el menú que aparece</p>
+      <h3>Subir ticket</h3><p>Elige "Fotos" en el menú que aparece</p>
     </div>
     <div class="upload-actions">
       <button class="btn-secondary" onclick="triggerCamera()">Cámara</button>
@@ -1346,7 +1434,7 @@ function getPredictions(){
 // ── SETTINGS ───────────────────────────────────────────────────
 function renderSettings(){
   document.getElementById('view').innerHTML=`
-    <div class="screen-header"><div style="display:flex;align-items:flex-end;gap:12px"><img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1)" onerror="this.style.display='none'"/><h1 style="padding-bottom:2px">Configuración</h1></div></div>
+    <div class="screen-header"><div style="display:flex;align-items:flex-end;gap:12px"><img src="icon.png" style="width:44px;height:44px;border-radius:12px;object-fit:cover;filter:invert(1) brightness(0.87) hue-rotate(210deg) saturate(0.3)" onerror="this.style.display='none'"/><h1 style="padding-bottom:2px">Configuración</h1></div></div>
     <div style="height:8px"></div>
     <div class="settings-section">
       <div class="settings-section-title">Personas (${DB.persons.length})</div>
@@ -1404,7 +1492,10 @@ function editKnowledgeProducts(){
   openModal(`<div class="modal-title">Productos aprendidos</div>
     <p style="font-size:12px;color:var(--txt2);margin-bottom:12px">Edita el nombre, asigna a persona o elimina. Los cambios se aplican en futuros tickets.</p>
     <div style="max-height:55vh;overflow-y:auto">${rows}</div>
-    <button class="btn-primary" style="margin-top:14px" onclick="saveDB();closeModal();showToast('Guardado');renderSettings()">Listo</button>`);
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" style="flex:1" onclick="saveDB();closeModal();showToast('Guardado');renderSettings()">Guardar</button>
+    </div>`);
 }
 function assignKnowledgeProduct(key,pid){
   if(!DB.knowledge.products[key]) return;
@@ -1494,7 +1585,7 @@ async function sendAIMessage(){
   // 🥚 Easter egg
   if(/secreto/i.test(msg)){
     setTimeout(()=>{
-      DB.aiConvMessages.push({role:'bot',content:'🤫 Psst… esta app fue creada con mucho amor de Carli para Dami ♥️'});
+      DB.aiConvMessages.push({role:'bot',content:'🤫 Psst… esta \'app\' fue creada con mucho amor de Carli para Dami ♥️'});
       saveDB();renderAIChat();
       const msgs=document.getElementById('ai-messages');if(msgs)msgs.scrollTop=msgs.scrollHeight;
     },600);
