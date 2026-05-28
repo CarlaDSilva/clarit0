@@ -55,6 +55,17 @@ function loadDB(){
   if(!DB.aiConvMessages) DB.aiConvMessages=[];
   DB.persons.forEach(p=>{if(!p.cards)p.cards=[];});
 }
+function expireOldTickets(){
+  // Eliminar tickets con más de 1 mes natural desde su fecha de subida
+  const now=new Date();
+  const cutoff=new Date(now.getFullYear(),now.getMonth()-1,now.getDate()).toISOString().slice(0,10);
+  const before=DB.tickets.length;
+  DB.tickets=DB.tickets.filter(t=>{
+    const d=t.createdAt||t.date;
+    return !d||d>=cutoff;
+  });
+  if(DB.tickets.length<before) saveDB();
+}
 function saveDB(){S.set('db',DB);}
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -652,6 +663,20 @@ function parseTicketText(text){
       if(negM){
         const disc=parseFloat(negM[1].replace(',','.'));
         if(out.length>0){
+          // Check if prev line was a category code — if so, apply discount to cheapest
+          // product with that code in the last 4 products
+          const prevLine=pLines[i-2]?.trim()||''; // line before the negative price
+          if(ALFA_CODE_RX.test(prevLine)){
+            // Find cheapest product tagged with this code in recent products
+            const tagged=out.slice(-4).filter(p=>p._code===prevLine);
+            if(tagged.length>1){
+              const cheapest=tagged.reduce((a,b)=>a.unitPrice<b.unitPrice?a:b);
+              cheapest.discount=(cheapest.discount||0)+disc;
+              cheapest.finalPrice=parseFloat(Math.max(0,cheapest.finalPrice-disc).toFixed(2));
+              continue;
+            }
+          }
+          // Default: apply to immediately previous product
           const last=out[out.length-1];
           last.discount=(last.discount||0)+disc;
           last.finalPrice=parseFloat(Math.max(0,last.finalPrice-disc).toFixed(2));
@@ -720,7 +745,14 @@ function parseTicketText(text){
       // Nombre de producto → añadir con precio 0
       if(!isKgInfo(l)&&!WEIGHT_RX.test(l)){
         const nm=cleanName(l);
-        if(nm.length>=2) out.push(makeProduct(nm,l,0,1));
+        // Look ahead for a code on the next line
+        const nextL=(pLines[i]||'').trim();
+        const code=ALFA_CODE_RX.test(nextL)?nextL:null;
+        if(nm.length>=2){
+          const prod=makeProduct(nm,l,0,1);
+          if(code) prod._code=code;
+          out.push(prod);
+        }
       }
     }
     // Limpiar productos sin precio
@@ -1311,9 +1343,11 @@ function calcBalance(){
 
 // ── TICKETS SCREEN ─────────────────────────────────────────────
 function renderTickets(){
-  const tickets=DB.tickets.slice().reverse();
+  const all=DB.tickets.slice().reverse();
+  const active=all.filter(t=>!t.settled);
+  const past=all.filter(t=>t.settled);
   document.getElementById('view').innerHTML=`
-    <div class="screen-header"><h1>Tickets</h1><p>${tickets.length} registrados</p></div>
+    <div class="screen-header"><h1>Tickets</h1><p>${active.length} activos</p></div>
     <div class="upload-zone" onclick="triggerFileGallery()">
       <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3"/><polyline points="12 8 12 16"/><polyline points="8 12 12 8 16 12"/></svg>
       <h3>Subir ticket</h3>
@@ -1323,9 +1357,15 @@ function renderTickets(){
       <button class="btn-secondary" onclick="openManualTicket()">Manual</button>
     </div>
     <div style="height:16px"></div>
-    ${tickets.length===0
-      ?`<div class="empty-state"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/></svg><h3>Sin tickets todavía</h3><p>Sube una foto para empezar</p></div>`
-      :tickets.map(renderTicketListItem).join('')}`;
+    ${active.length===0
+      ?`<div class="empty-state"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/></svg><h3>Sin tickets activos</h3><p>Sube una foto para empezar</p></div>`
+      :active.map(renderTicketListItem).join('')}
+    ${past.length>0?`
+    <div class="recent-label" style="margin-top:20px;display:flex;align-items:center;justify-content:space-between">
+      <span>Tickets pasados</span>
+      <span style="font-size:12px;color:var(--txt3)">${past.length}</span>
+    </div>
+    <div style="opacity:0.65">${past.map(renderTicketListItem).join('')}</div>`:''}`;
   const zone=document.querySelector('.upload-zone');
   if(zone){
     zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag')});
@@ -1520,7 +1560,35 @@ function learnFromTicket(t){
   });
 }
 function closeTicketEditor(){document.getElementById('ticket-editor').style.display='none';currentTicket=null;}
-function deleteCurrentTicket(){if(!currentTicket) return;DB.tickets=DB.tickets.filter(t=>t.id!==currentTicket.id);saveDB();closeTicketEditor();showToast('Ticket eliminado');showScreen(currentScreen);}
+function deleteCurrentTicket(){
+  if(!currentTicket) return;
+  const t=currentTicket;
+  const hasProducts=t.products&&t.products.length>0;
+  openModal(`<div class="modal-title">Eliminar ticket</div>
+    <p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:16px">¿Eliminar el ticket de ${t.store||'este supermercado'}?</p>
+    ${hasProducts?`<label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:14px;color:var(--txt1)">
+      <input type="checkbox" id="del-knowledge" style="width:18px;height:18px">
+      Eliminar también los productos aprendidos de este ticket
+    </label>`:''}
+    <div style="display:flex;gap:10px">
+      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
+      <button class="btn-danger" style="flex:1" onclick="confirmDeleteTicket('${t.id}')">Eliminar</button>
+    </div>`);
+}
+function confirmDeleteTicket(id){
+  const t=DB.tickets.find(t=>t.id===id);
+  if(!t){closeModal();return;}
+  // Optionally remove learned products from this ticket
+  const removeKnowledge=document.getElementById('del-knowledge')?.checked;
+  if(removeKnowledge&&t.products){
+    t.products.forEach(p=>{
+      const key=normalizeKey(p.rawName||p.name||'');
+      if(key&&DB.knowledge.products[key]) delete DB.knowledge.products[key];
+    });
+  }
+  DB.tickets=DB.tickets.filter(t=>t.id!==id);
+  saveDB();closeModal();closeTicketEditor();showToast('Ticket eliminado');showScreen(currentScreen);
+}
 function openManualTicket(){openTicketEditor(getEmptyTicket());}
 function editItem(id){const t=DB.tickets.find(x=>x.id===id);if(t){openTicketEditor(t);return;}const e=DB.expenses.find(x=>x.id===id);if(e) openExpenseEditor(e);}
 
@@ -1627,6 +1695,8 @@ function renderStats(){
   const monthEnd=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().slice(0,10);
   const monthT=allT.filter(t=>t.date&&t.date>=monthStart&&t.date<=monthEnd);
   const monthTotal=monthT.reduce((s,t)=>s+(parseFloat(t.total)||0),0);
+  const allTimeTotal=allT.reduce((s,t)=>s+(parseFloat(t.total)||0),0);
+  const allTimeCount=allT.length;
 
   // Gasto real por persona este mes:
   // - Lo que pagaron de su bolsillo (total del ticket si son el pagador)
@@ -1688,7 +1758,8 @@ function renderStats(){
     <div class="screen-header"><h1>Estadísticas</h1><p>Análisis del hogar</p></div>
 
     <div class="stats-grid" style="margin-top:16px">
-      <div class="stat-card"><div class="stat-label">Este mes total</div><div class="stat-value">${fmt(monthTotal)}</div></div>
+      <div class="stat-card"><div class="stat-label">Este mes</div><div class="stat-value">${fmt(monthTotal)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total histórico</div><div class="stat-value">${fmt(allTimeTotal)}</div></div>
       <div class="stat-card"><div class="stat-label">Tickets totales</div><div class="stat-value">${allT.length}</div></div>
     </div>
 
@@ -1704,13 +1775,14 @@ function renderStats(){
 
     ${anomalies.length?`<div style="margin:0 16px 14px">${anomalies.map(a=>`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--rad-sm);padding:10px 12px;margin-bottom:8px;font-size:13px;color:#f59e0b">${a}</div>`).join('')}</div>`:''}
 
-    ${topProds.length?`<div class="recent-label">Productos más comprados</div><div class="bar-chart">${topProds.map(([name,qty])=>`<div class="bar-row" style="gap:8px"><div class="bar-name" style="width:130px">${name}</div><div class="bar-track" style="max-width:120px"><div class="bar-fill" style="width:${Math.round(qty/topProds[0][1]*100)}%;background:var(--accent)"></div></div><div class="bar-amt">${qty}x</div></div>`).join('')}</div>`:''}
-
-    ${catSorted.length?`<div class="recent-label">Por categoría</div><div class="bar-chart">${catSorted.map(([cat,amt])=>{const ci=EXPENSE_CATS.find(c=>c.id===cat)||{label:cat};return`<div class="bar-row" style="gap:8px"><div class="bar-name" style="width:130px">${ci.label||cat}</div><div class="bar-track" style="max-width:120px"><div class="bar-fill" style="width:${Math.round(amt/catMax*100)}%;background:var(--accent)"></div></div><div class="bar-amt">${fmt(amt)}</div></div>`;}).join('')}</div>`:''}
+    <div class="recent-label">Despensa estimada</div>${renderInventorySection()}
 
     ${storeSorted.length?`<div class="recent-label">Por supermercado</div><div class="bar-chart">${storeSorted.map(([s,a],i)=>{const cols=['var(--accent)','var(--green)','var(--blue)','var(--amber)','var(--red)'];return`<div class="bar-row" style="gap:8px"><div class="bar-name" style="width:130px">${s}</div><div class="bar-track" style="max-width:120px"><div class="bar-fill" style="width:${Math.round(a/storeSorted[0][1]*100)}%;background:${cols[i]}"></div></div><div class="bar-amt">${fmt(a)}</div></div>`;}).join('')}</div>`:''}
 
-    <div class="recent-label">Despensa estimada</div>${renderInventorySection()}`;
+    ${topProds.length||catSorted.length?`<details style="margin:0 16px"><summary style="font-size:13px;color:var(--txt2);padding:12px 0;cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>Más estadísticas</summary>
+    ${topProds.length?`<div class="recent-label">Productos más comprados</div><div class="bar-chart">${topProds.map(([name,qty])=>`<div class="bar-row" style="gap:8px"><div class="bar-name" style="width:130px">${name}</div><div class="bar-track" style="max-width:120px"><div class="bar-fill" style="width:${Math.round(qty/topProds[0][1]*100)}%;background:var(--accent)"></div></div><div class="bar-amt">${qty}x</div></div>`).join('')}</div>`:''}
+    ${catSorted.length?`<div class="recent-label">Por categoría</div><div class="bar-chart">${catSorted.map(([cat,amt])=>{const ci=EXPENSE_CATS.find(c=>c.id===cat)||{label:cat};return`<div class="bar-row" style="gap:8px"><div class="bar-name" style="width:130px">${ci.label||cat}</div><div class="bar-track" style="max-width:120px"><div class="bar-fill" style="width:${Math.round(amt/catMax*100)}%;background:var(--accent)"></div></div><div class="bar-amt">${fmt(amt)}</div></div>`;}).join('')}</div>`:''}
+    </details>`:''}`;
 }
 function detectAnomalies(){
   const now=new Date(),msgs=[];
@@ -1746,7 +1818,7 @@ function renderSettings(){
       </div>
     </div>
     ${DB.devMode?`<div class="settings-section">
-      <div class="settings-section-title">APIs 🛠</div>
+      <div class="settings-section-title">APIs</div>
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="editVisionKey()"><div class="settings-icon" style="background:#1a3a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h3M7 12h3M7 16h3M14 8h3M14 12h3M14 16h3"/></svg></div><div class="settings-label">Google Vision Key</div><div class="settings-value">${DB.visionKey?'•••'+DB.visionKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
         ${DB.visionKey?('<div class="settings-row" onclick="showVisionStats()" style="cursor:pointer"><div class="settings-icon" style="background:#0a2a1a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/></svg></div><div class="settings-label">Uso de Vision</div><div class="settings-value">'+(DB.visionStats?.calls||0)+' lecturas</div><div class="settings-arrow">›</div></div>'):''}
@@ -1765,7 +1837,7 @@ function renderSettings(){
     </div>
     `:''}
     ${DB.devMode?`<div class="settings-section">
-      <div class="settings-section-title">Datos 🛠</div>
+      <div class="settings-section-title">Datos</div>
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="editKnowledgeProducts()"><div class="settings-label">Productos aprendidos</div><div class="settings-value">${Object.keys(DB.knowledge.products).length}</div><div class="settings-arrow">›</div></div>
         <div class="settings-row" onclick="clearKnowledge()"><div class="settings-label" style="color:var(--red)">Borrar conocimiento IA</div></div>
