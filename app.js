@@ -323,7 +323,7 @@ function parseTicketText(text){
 
   // ── SKIP — líneas que nunca son productos ─────────────────────
   // Normas generales para todos los supermercados
-  const SKIP_RX=/^(subtotal|iva|base\s*imp|cuota|tipo\s*$|venta\s*$|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|debit|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|secc|tel[eé]f|telf|telef|op:|pol\.|s\.a\.|c\.i\.f|bienvenid|hasta\s*pronto|recib|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale|\d+[.,]\d+%|art\.?\s*total|centros\s+comerciales|^lidl$|^aldi$|^idl\)?)/i;
+  const SKIP_RX=/^(subtotal|iva|base\s*imp|cuota|tipo\s*$|venta\s*$|importe|a\s*pagar|tarjeta|visa|mastercard|maestro|amex|debit|cambio|efectivo|devoluci|entrega|gracias|ticket|n[uú]mero|fecha|hora|caja|operador|factura|simplificada|nif|cif|www\.|https?:|descripci|p\.\s*unit|secc|tel[eé]f|telf|telef|op:|pol\.|s\.a\.|c\.i\.f|bienvenid|hasta\s*pronto|recib|socio|puntos|ahorro|dto\.|descuento\s|premio|bono|cupon|vale|\d+[.,]\d+%|art\.?\s*total|centros\s+comerciales|^lidl$|^aldi$|^idl\)?|ventajas\b|descuentos:|total\s+ventajas|total\s+descuentos)/i;
 
   // Líneas promocionales / publicitarias
   const PROMO_RX = /^(-[A-ZÁÉÍÓÚÑ]|EL\s+CLUB\b|MI\s+DÍA|LLEGA\b|CLUB\b$)/i;
@@ -392,25 +392,57 @@ function parseTicketText(text){
 
   // ── Detectar total global ─────────────────────────────────────
   let total=0;
-  // Buscar IMPORTE: / TOTAL A PAGAR / ART. TOTAL / ==== seguido de precio
-  const TOTAL_TRIGGER_RX=/^(\*total[\s.]*|total[\s.]+|total\s+a\s+pagar|art\.?[\s.]*total|====+|importe\s+eur:|importe\s*:)/i;
-  for(let ti=0;ti<lines.length;ti++){
-    const l=lines[ti].trim();
-    // Precio inline en la misma línea: "IMPORTE: 11,82 EUR"
-    const inlineTotal=l.match(/(?:importe?|\*?total|imp\.|entrega:)[^0-9]*(\d{1,4}[.,]\d{2})\s*(?:eur|€\.?)?/i);
-    if(inlineTotal){ const v=parseFloat(inlineTotal[1].replace(',','.')); if(v>0){total=v;break;} }
-    if(!TOTAL_TRIGGER_RX.test(l)) continue;
-    // Buscar precio en las siguientes líneas — saltar texto intermedio (Entrega:, etc.)
-    for(let k=1;k<=6;k++){
-      if(ti+k>=lines.length) break;
-      const nxt=lines[ti+k].trim();
-      if(!nxt||SEP_RX.test(nxt)) continue;
-      // Precio en la línea con o sin "Eur."
-      const nm=nxt.match(/^(\d{1,4}[.,]\d{2})\s*(?:eur|€)?\.?\s*$/i)||
-               nxt.match(/(?:entrega:|tarjetas:)[^0-9]*(\d{1,4}[.,]\d{2})/i);
-      if(nm){ const v=parseFloat(nm[1].replace(',','.')); if(v>0){total=v;break;} }
+  // Prioridad 1: IMPORTE / IMP. (línea más fiable)
+  for(const l of lines){
+    const m=l.match(/imp(?:orte)?[\s.]*(?:eur[\s.]*)?[.:]\s*(\d{1,4}[.,]\d{2})/i);
+    if(m){const v=parseFloat(m[1].replace(',','.'));if(v>0){total=v;break;}}
+  }
+  // Prioridad 2: *Total: o ART.TOTAL con precio inline o en línea siguiente
+  if(!total){
+    const ART_TOTAL_RX=/^(\*total[\s.:]*$|\*total\s+[\d,.]|art\.?[\s.]*total[\s\w]*|16\s+art\.?)/i;
+    for(let ti=0;ti<lines.length;ti++){
+      const l=lines[ti].trim();
+      const inlineM=l.match(/(?:\*?total|art\.?[\s.]*total)[^0-9]*(\d{1,4}[.,]\d{2})/i);
+      if(inlineM){const v=parseFloat(inlineM[1].replace(',','.'));if(v>0){total=v;break;}}
+      if(!ART_TOTAL_RX.test(l)) continue;
+      for(let k=1;k<=3;k++){
+        if(ti+k>=lines.length) break;
+        const nxt=lines[ti+k].trim();
+        const nm=nxt.match(/^(\d{1,4}[.,]\d{2})\s*(?:eur|€)?\.?\s*$/i);
+        if(nm){const v=parseFloat(nm[1].replace(',','.'));if(v>0){total=v;break;}}
+        if(/^[a-záéíóúñ]/i.test(nxt)&&nxt.length>3) break;
+      }
+      if(total) break;
     }
-    if(total) break;
+  }
+  // Prioridad 3: Entrega: o Tarjetas: con precio (Froiz)
+  if(!total){
+    for(const l of lines){
+      const m=l.match(/(?:entrega:|tarjetas:)[^0-9]*(\d{1,4}[.,]\d{2})/i)||
+               l.match(/^(\d{1,4}[.,]\d{2})\s*eur\.?\s*$/i);
+      if(m){const v=parseFloat(m[1].replace(',','.'));if(v>0){total=v;break;}}
+    }
+  }
+  // Prioridad 4: *Total: con precio en siguiente línea (Froiz)
+  if(!total){
+    for(let ti=0;ti<lines.length;ti++){
+      if(!/^\*total/i.test(lines[ti].trim())) continue;
+      for(let k=1;k<=6;k++){
+        if(ti+k>=lines.length) break;
+        const nxt=lines[ti+k].trim();
+        const nm=nxt.match(/^(\d{1,4}[.,]\d{2})\s*(?:eur)?\.?\s*$/i)||
+                 nxt.match(/(?:entrega:|tarjetas:)[^0-9]*(\d{1,4}[.,]\d{2})/i);
+        if(nm){const v=parseFloat(nm[1].replace(',','.'));if(v>0){total=v;break;}}
+      }
+      if(total) break;
+    }
+  }
+  // Fallback: número repetido más grande
+  if(!total){
+    const allP=lines.map(l=>l.trim().match(/^(\d{1,4}[.,]\d{2})$/)).filter(Boolean).map(m=>parseFloat(m[1].replace(',','.')));
+    const freq={};allP.forEach(p=>{freq[p]=(freq[p]||0)+1;});
+    const repeated=Object.entries(freq).filter(([,c])=>c>=2).map(([p])=>parseFloat(p));
+    if(repeated.length) total=Math.max(...repeated);
   }
   // Fallback: buscar "11,82" repetido (Carrefour lo repite como confirmación)
   if(!total){
@@ -435,7 +467,7 @@ function parseTicketText(text){
 
   // ── Cortar en línea de total / impuestos ──────────────────────
   // Todo lo que viene después de la primera línea de corte no es producto
-  const CUT_RX=/^(total[\s.]*$|art\.?[\s.]*total|total[\s.]*a[\s.]*pagar|tipo\s*$|====+|base\s*$|cuota\s*$)/i;
+  const CUT_RX=/^(total[\s.]*$|art\.?[\s.]*total[\s\w]*|total[\s.]*a[\s.]*p\w+|tipo\s*$|====+|base\s*$|cuota\s*$)/i;
   // Pre-detectar formato Lidl columnas antes de cortar
   // En Lidl columnas los precios B/A vienen DESPUÉS de TOTAL — no cortar en TOTAL
   // Detectar Lidl columnas inline (sin usar LIDL_PRICE_RX que aún no está declarado)
@@ -612,6 +644,7 @@ function parseTicketText(text){
       if(isSkip(l)||SEP_RX.test(l)||BARCODE_RX.test(l)) continue;
       if(/^\d{1,2}[\/.:]\d{2}/.test(l)) continue;
       if(/^\d{1,3}$/.test(l)) continue; // número suelto de artículos
+      if(/^[-–]\s*[^\d]/.test(l)&&l.length<=5) continue; // basura OCR tipo "-リ"
 
       // Descuento negativo suelto → aplicar al último producto
       const negM=l.match(NEG_PRICE_RX);
