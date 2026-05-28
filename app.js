@@ -334,7 +334,7 @@ function parseTicketText(text){
   // ── Detectar tienda ───────────────────────────────────────────
   const STORES=['mercadona','lidl','aldi','carrefour','dia','eroski','alcampo','consum',
     'hipercor','el corte ingles','supercor','spar','froiz','ahorramas','bonarea','decathlon',
-    'primark','zara','mediamarkt','fnac','leroy','bricomart','ikea','distribuciones froiz'];
+    'primark','zara','mediamarkt','fnac','leroy','bricomart','ikea','distribuciones froiz','gadis','pontevicus'];
   let store='';
   for(const l of lines.slice(0,6)){
     const low=l.toLowerCase();
@@ -352,11 +352,14 @@ function parseTicketText(text){
 
   // ── Detectar fecha y hora ─────────────────────────────────────
   let date=null, time=null;
-  // Primera pasada: buscar hora en línea sola HH:MM:SS (más fiable, al pie del ticket)
+  // Primera pasada: buscar hora standalone HH:MM:SS o en línea junto a fecha
   for(const l of lines){
     const t=l.trim();
-    const standalone=t.match(/^(\d{1,2}):(\d{2}):\d{2}$/);
+    const standalone=t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
     if(standalone){ time=`${standalone[1].padStart(2,'0')}:${standalone[2]}`; break; }
+    // Hora en la misma línea que la fecha: "13/04/2026 09:45" o "22 05 2026 20:47"
+    const inline=t.match(/\d{4}\s+(\d{1,2}):(\d{2})(?::\d{2})?/)||t.match(/\d{2,4}[\/\-]\s*\d{4}\s+(\d{1,2}):(\d{2})/);
+    if(inline){ time=`${inline[1].padStart(2,'0')}:${inline[2]}`; break; }
   }
   // Segunda pasada: fecha y hora inline si no se encontró standalone
   for(const l of lines){
@@ -388,7 +391,7 @@ function parseTicketText(text){
   // ── Detectar total global ─────────────────────────────────────
   let total=0;
   // Buscar IMPORTE: / TOTAL A PAGAR / ART. TOTAL / ==== seguido de precio
-  const TOTAL_TRIGGER_RX=/^(\*total\b|total\s+a\s+pagar|art\.?[\s.]*total|====+)/i; // NO bare 'total' (es cabecera IVA en Froiz)
+  const TOTAL_TRIGGER_RX=/^(\*total[\s.]*|total[\s.]+|total\s+a\s+pagar|art\.?[\s.]*total|====+|importe\s+eur:|importe\s*:)/i;
   for(let ti=0;ti<lines.length;ti++){
     const l=lines[ti].trim();
     // Precio inline en la misma línea: "IMPORTE: 11,82 EUR"
@@ -430,7 +433,7 @@ function parseTicketText(text){
 
   // ── Cortar en línea de total / impuestos ──────────────────────
   // Todo lo que viene después de la primera línea de corte no es producto
-  const CUT_RX=/^(total\s*$|art\.?[\s.]*total|total[\s.]*a[\s.]*pagar|tipo\s*$|====+|base\s*$|cuota\s*$)/i;
+  const CUT_RX=/^(total[\s.]*$|art\.?[\s.]*total|total[\s.]*a[\s.]*pagar|tipo\s*$|====+|base\s*$|cuota\s*$)/i;
   // Pre-detectar formato Lidl columnas antes de cortar
   // En Lidl columnas los precios B/A vienen DESPUÉS de TOTAL — no cortar en TOTAL
   // Detectar Lidl columnas inline (sin usar LIDL_PRICE_RX que aún no está declarado)
@@ -456,6 +459,9 @@ function parseTicketText(text){
   const LIDL_PRICE_RX=/^(\d{1,3}[.,]\d{2})\s*[A-Z]\s*$/; // "1,15 B", "3,25 A"
   const MULT_RX=/^[\d.,]+\s*(?:kg\s*)?[xX]\s*[\d.,]+/;   // "1,718 kg x 1,89"
   const UNIT_PRICE_X_RX=/^(\d{1,3}[.,]\d{2})[xX]\s*$/;     // "2,49x"
+  // Helpers Lidl accesibles en todo el parser
+  function parseLidlPrice(l){const m=l.match(/^(\d{1,3}[.,]\d{2})/);return m?parseFloat(m[1].replace(',','.')):null;}
+  function isLidlPrice(l){return LIDL_PRICE_RX.test(l);}
 
   // ── PARSEAR PRODUCTOS ─────────────────────────────────────────
   const products=[];
@@ -1705,25 +1711,32 @@ function consultGroqUsage(){
       Groq no expone estadísticas de uso por API key sin acceso al dashboard. El contador local refleja todas las llamadas hechas desde esta app.
     </p>
     <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" style="flex:2" onclick="closeModal();doGroqUsageCheck()">Consultar de todas formas</button>
+      <button class="btn-primary" style="flex:1" onclick="closeModal()">Cancelar</button>
+      <button class="btn-secondary" style="flex:2;opacity:0.55;font-size:12px" onclick="closeModal();doGroqUsageCheck()">consultar de todas formas</button>
     </div>`);
 }
 async function doGroqUsageCheck(){
   if(!DB.groqKey){showToast('Sin API key');return;}
   showToast('Consultando...');
   try{
-    // Minimal call to get token usage info from response
     const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+DB.groqKey},
       body:JSON.stringify({model:'llama-3.1-8b-instant',messages:[{role:'user',content:'1'}],max_tokens:1})
     });
     const d=await res.json();
-    if(d.usage) showToast('Tokens en esta llamada: '+d.usage.total_tokens+' · Ver panel Groq para uso total');
-    else if(d.error) showToast('Error Groq: '+d.error.message);
-    else showToast('Conexión OK · Usa el panel de Groq.com para el total');
-  }catch(e){showToast('Error de red: '+e.message);}
+    if(d.usage){
+      // Registrar esta llamada en las stats
+      if(!DB.groqStats) DB.groqStats={calls:0,firstCall:null,tokensUsed:0};
+      DB.groqStats.calls=(DB.groqStats.calls||0)+1;
+      DB.groqStats.tokensUsed=(DB.groqStats.tokensUsed||0)+(d.usage.total_tokens||0);
+      if(!DB.groqStats.firstCall) DB.groqStats.firstCall=new Date().toISOString().slice(0,10);
+      S.set('groqStats',JSON.stringify(DB.groqStats));
+      showToast('Conexión OK · '+d.usage.total_tokens+' tokens · Stats actualizadas',3000);
+    }
+    else if(d.error) showToast('Error: '+d.error.message);
+    else showToast('Conexión OK');
+  }catch(e){showToast('Sin conexión');}
 }
 function addPerson(){const idx=DB.persons.length;DB.persons.push({id:'p'+(idx+1),name:'Persona '+(idx+1),color:PRESET_COLORS[idx%PRESET_COLORS.length],cards:[]});saveDB();renderSettings();editPerson(idx);}
 function editPerson(idx){
