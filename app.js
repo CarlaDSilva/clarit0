@@ -835,75 +835,90 @@ function parseTicketText(text){
   //  Hay basura OCR antes: "82", "ooo", "EUR" — filtrar
   // ══════════════════════════════════════════════════════════════
   function parseLidlInline(pLines, out){
-    // Estrategia: recoger todos los nombres y todos los precios por separado,
-    // luego parearlos por posición en el documento.
-    // Esto maneja el caso donde el OCR de iPhone mezcla nombres y precios
-    // pero no siempre inline — pueden venir grupos de nombres seguidos de grupos de precios.
+    // Lidl iPhone/iPad mixed format:
+    // Nombres + "Desc." markers → bloque de precios B/A + negativos
+    // "Desc." indica que el siguiente precio negativo va a ese producto
+    //
+    // Estrategia unificada:
+    // 1. Recoger (nombre, hasDiscount) en orden
+    // 2. Recoger precios B/A en orden, y negativos como descuentos
+    // 3. Parear: precio[k] → nombre[k], descuento_negativo → al producto marcado con Desc.
 
     // Empezar después del NIF
     let startIdx=0;
-    {
-      const nifIdx=pLines.findIndex(l=>/^nif\b/i.test(l.trim()));
-      if(nifIdx>=0) startIdx=nifIdx+1;
-    }
+    {const nifIdx=pLines.findIndex(l=>/^nif\b/i.test(l.trim()));if(nifIdx>=0)startIdx=nifIdx+1;}
     const lines=pLines.slice(startIdx);
 
     function isProductName(l){
       if(!l||l.length<2) return false;
       if(isSkip(l)||BARCODE_RX.test(l)||SEP_RX.test(l)) return false;
-      if(/^\d{1,2}[\/.:]\d{2}/.test(l)) return false;
-      if(/^(nif|cif|eur\/kg|eur$|entrega|recibo|total|inicio|folletos|mi\s+cuenta|lidl\s+plus|ooo)/i.test(l)) return false;
+      if(/^(nif|cif|eur\/kg|eur$|entrega|recibo|total|inicio|folletos|mi\s+cuenta|lidl\s+plus|ooo|desc\.?$)/i.test(l)) return false;
       if(/calle|avda|plaza|\d{5}/.test(l)) return false;
       if(/s\.a\.u?\.?$|s\.l\.$/i.test(l)) return false;
       if(store&&l.toLowerCase().includes(store.toLowerCase())) return false;
       if(/^(lidl|aldi|dia|mercadona|carrefour)$/i.test(l)) return false;
       if(/^(82|ooo|'|"|eur$)$/i.test(l)) return false;
-      if(isLidlPrice(l)||isPrice(l)||UNIT_PRICE_X_RX.test(l)) return false;
+      if(LIDL_PRICE_RX.test(l)||isPrice(l)||UNIT_PRICE_X_RX.test(l)) return false;
       if(/^\d+$/.test(l)) return false;
+      if(/^-\d{1,3}[.,]\d{2}$/.test(l)) return false; // precio negativo (descuento)
       if(isKgInfo(l)||WEIGHT_RX.test(l)||MULT_RX.test(l)) return false;
+      if(/^\d+g\s*[\(\d]/i.test(l)) return false; // "4G (1" basura OCR
       return true;
     }
 
-    // Recoger entradas: {name, qty, unitP, kgInfo}
+    // Recoger entradas: {name, hasDiscount}
     const entries=[];
     let i=0;
     while(i<lines.length){
       const l=lines[i].trim(); i++;
       if(!isProductName(l)) continue;
-      let qty=1, unitP=null, kgInfo=null;
-      // Mirar si viene pack (2,49x → 2) en las siguientes líneas
-      let j=i;
-      while(j<lines.length){
-        const nxt=lines[j].trim();
-        if(UNIT_PRICE_X_RX.test(nxt)){const m=nxt.match(/^(\d{1,3}[.,]\d{2})/);unitP=m?parseFloat(m[1].replace(',','.')):null;j++;
-          if(j<lines.length&&/^\d+$/.test(lines[j].trim())){qty=parseInt(lines[j].trim());j++;}
-          break;}
-        if(MULT_RX.test(nxt)){kgInfo=nxt;j++;if(j<lines.length&&/^eur\/kg/i.test(lines[j].trim()))j++;break;}
-        break;
-      }
-      i=j;
-      entries.push({name:l, qty, unitP, kgInfo});
+      // Mirar si sigue "Desc." → este producto tiene descuento
+      let hasDiscount=false;
+      if(i<lines.length&&/^desc\.?$/i.test(lines[i].trim())){hasDiscount=true;i++;}
+      // Mirar si sigue pack (2,49x → 2)
+      let kgInfo=null;
+      if(i<lines.length&&MULT_RX.test(lines[i].trim())){kgInfo=lines[i].trim();i++;
+        if(i<lines.length&&/^eur\/kg/i.test(lines[i].trim()))i++;}
+      entries.push({name:l,hasDiscount,kgInfo});
     }
 
-    // Recoger todos los precios en orden de documento
-    const prices=[];
+    // Recoger precios positivos B/A en orden de documento
+    const posPrices=[];
     for(const l of lines){
       const t=l.trim();
-      if(isLidlPrice(t)){const p=parseLidlPrice(t);if(p!=null&&p>0&&p<500)prices.push(p);}
+      if(LIDL_PRICE_RX.test(t)){const p=parseLidlPrice(t);if(p!=null&&p>0)posPrices.push(p);}
     }
 
-    // Parear: cada entrada con su precio en posición
+    // Parear nombres con precios positivos por posición
     for(let k=0;k<entries.length;k++){
       const e=entries[k];
-      const price=prices[k];
+      const price=posPrices[k];
       if(price==null) continue;
       const nm=cleanName(e.name);
       if(nm.length<2) continue;
-      if(e.kgInfo){out.push(makeProduct(nm,e.name,price,1));}
-      else if(e.qty>1&&e.unitP){out.push(makeProduct(nm,e.name,e.unitP,e.qty));}
-      else{out.push(makeProduct(nm,e.name,price,1));}
+      out.push(makeProduct(nm,e.name,price,1));
     }
+
+    // Aplicar descuentos negativos a los productos marcados con Desc.
+    // Los negativos van en orden a los entries que tienen hasDiscount=true
+    const discEntries=entries.map((e,k)=>({k,has:e.hasDiscount})).filter(x=>x.has);
+    const negAmounts=[];
+    for(const l of lines){
+      const t=l.trim();
+      if(/^-(\d{1,3}[.,]\d{2})$/.test(t)){
+        const m=t.match(/^-(\d{1,3}[.,]\d{2})$/);
+        negAmounts.push(parseFloat(m[1].replace(',','.')));
+      }
+    }
+    discEntries.forEach(({k},j)=>{
+      const disc=negAmounts[j];
+      const prod=out[k];
+      if(!prod||!disc) return;
+      prod.discount=(prod.discount||0)+disc;
+      prod.finalPrice=parseFloat(Math.max(0,prod.finalPrice-disc).toFixed(2));
+    });
   }
+
 
   function parseGeneric(pLines, out){
     // ── Detectar formato Lidl columnas con el OCR real ──
@@ -1528,7 +1543,9 @@ function saveTicket(){
   const idx=DB.tickets.findIndex(x=>x.id===t.id);
   if(idx>=0) DB.tickets[idx]=t; else DB.tickets.push(t);
   saveDB();
-  closeTicketEditor();showToast('Ticket guardado');showScreen(currentScreen==='tickets'?'tickets':'home');
+  closeTicketEditor();showToast('Ticket guardado');
+  const targetScreen=currentScreen==='tickets'?'tickets':'home';
+  showScreen(targetScreen);
 }
 function learnFromTicket(t){
   if(t.last4&&t.payer){
@@ -1572,29 +1589,23 @@ function deleteCurrentTicket(){
   if(!currentTicket) return;
   const t=currentTicket;
   const hasProducts=t.products&&t.products.length>0;
-  openModal(`<div class="modal-title">Eliminar ticket</div>
-    <p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:16px">¿Eliminar el ticket de ${t.store||'este supermercado'}?</p>
-    ${hasProducts?`<label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:14px;color:var(--txt1)">
-      <input type="checkbox" id="del-knowledge" style="width:18px;height:18px">
-      Eliminar también los productos aprendidos de este ticket
-    </label>`:''}
-    <div style="display:flex;gap:10px">
-      <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
-      <button class="btn-danger" style="flex:1" onclick="confirmDeleteTicket('${t.id}')">Eliminar</button>
-    </div>`);
+  const checkboxHtml=hasProducts?'<label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:14px;color:var(--txt1)"><input type="checkbox" id="del-knowledge" style="width:18px;height:18px"> Eliminar también los productos aprendidos de este ticket</label>':'';
+  const delHtml='<div class="modal-title">Eliminar ticket</div><p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:16px">¿Eliminar el ticket de '+(t.store||'este supermercado')+'?</p>'+checkboxHtml+'<div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="confirmDeleteTicket(\''+t.id+'\')">Eliminar</button></div>';
+  openModal(delHtml);
 }
 function confirmDeleteTicket(id){
-  const t=DB.tickets.find(t=>t.id===id);
+  const t=DB.tickets.find(tk=>tk.id===id);
   if(!t){closeModal();return;}
-  // Optionally remove learned products from this ticket
-  const removeKnowledge=document.getElementById('del-knowledge')?.checked;
-  if(removeKnowledge&&t.products){
+  const cb=document.getElementById('del-knowledge');
+  if(cb&&cb.checked&&t.products){
     t.products.forEach(p=>{
-      const key=normalizeKey(p.rawName||p.name||'');
-      if(key&&DB.knowledge.products[key]) delete DB.knowledge.products[key];
+      const raw=(p.rawName||p.name||'').toLowerCase().trim();
+      if(raw&&DB.knowledge&&DB.knowledge.products&&DB.knowledge.products[raw]){
+        delete DB.knowledge.products[raw];
+      }
     });
   }
-  DB.tickets=DB.tickets.filter(t=>t.id!==id);
+  DB.tickets=DB.tickets.filter(tk=>tk.id!==id);
   saveDB();closeModal();closeTicketEditor();showToast('Ticket eliminado');showScreen(currentScreen);
 }
 function openManualTicket(){openTicketEditor(getEmptyTicket());}
