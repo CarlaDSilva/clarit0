@@ -120,12 +120,12 @@ function renderSetupStep(){
         <label class="field-label">Google Cloud Vision Key <span style="color:var(--txt3)">(leer tickets)</span></label>
         <input type="password" id="s-visionkey" placeholder="AIzaSy..." value="${DB.visionKey||''}"/>
       </div>
-      <p style="font-size:12px;color:var(--txt2);margin-bottom:12px">console.cloud.google.com → APIs → Credenciales</p>
+      <p style="font-size:12px;color:var(--txt2);margin-bottom:12px"><a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent);text-decoration:underline" onclick="window.open(this.href,'_blank');return false">console.cloud.google.com</a> → APIs → Credenciales</p>
       <div class="field-row">
         <label class="field-label">Groq Key <span style="color:var(--txt3)">(asistente IA)</span></label>
         <input type="password" id="s-groqkey" placeholder="gsk_..." value="${DB.groqKey||''}"/>
       </div>
-      <p style="font-size:12px;color:var(--txt2);margin-bottom:20px">console.groq.com → API Keys (gratis)</p>
+      <p style="font-size:12px;color:var(--txt2);margin-bottom:20px"><a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent);text-decoration:underline" onclick="window.open(this.href,'_blank');return false">console.groq.com</a> → API Keys (gratis)</p>
       <button class="btn-primary" onclick="setupNext0()">Continuar →</button>`;
   } else if(setupStep===1){
     html+=`
@@ -306,7 +306,7 @@ function parseTicketText(text){
   const lines=rawLines.filter(l=>l.length>0);
 
   // ── Regexes globales ──────────────────────────────────────────
-  const PRICE_RX    = /^(\d{1,3}[.,]\d{2})\s*[)€]?\s*$/;          // línea que es solo un precio
+  const PRICE_RX    = /^(\d{1,3}[.,]\d{2})\s*[)€>]?\s*$/;         // línea que es solo un precio
   const INLINE_RX   = /^(.+?)\s{2,}(\d{1,3}[.,]\d{2})\s*[A-Z]?\s*$/; // NOMBRE   PRECIO [B/A] (2+ espacios)
   const QTY_OPEN_RX = /^(\d+)\s*[xX]\s*\($/;                       // "3 x (" o "2x ("
   // Formato qty en una sola línea que el OCR a veces produce: "3 x ( 1,29 )" o "X ( 1,29 )"
@@ -331,7 +331,7 @@ function parseTicketText(text){
   function isPrice(l)    { return PRICE_RX.test(l); }
   function isSkip(l)     { return SKIP_RX.test(l) || PROMO_RX.test(l) || BARCODE_RX.test(l) || SEP_RX.test(l) || WEIGHT_RX.test(l); }
   function isKgInfo(l)   { return KG_RX.test(l) && !PRICE_RX.test(l); }
-  function parsePrice(l) { return parseFloat(l.replace(/[)€]/g,'').replace(',','.').trim()); }
+  function parsePrice(l) { return parseFloat(l.replace(/[)€>]/g,'').replace(',','.').trim()); }
 
   // ── Detectar tienda ───────────────────────────────────────────
   const STORES=['mercadona','lidl','aldi','carrefour','dia','eroski','alcampo','consum',
@@ -635,16 +635,17 @@ function parseTicketText(text){
     const ALFA_CODE_RX=/^[A-Z0-9]{2,6}$/;  // "EV45", "4N21", "CZ67"
     const NEG_PRICE_RX=/^-(\d{1,3}[.,]\d{2})$/; // "-5,22"
     const DISCOUNT_NAME_RX=/^(descuento|dto\.?|oferta|3x2|2x1|1\s+3x2)/i;
-    function fp(t){return parseFloat(t.replace(/[)€]/g,'').replace(',','.').trim());}
+    function fp(t){return parseFloat(t.replace(/[)€>]/g,'').replace(',','.').trim());}
 
     let i=0;
     while(i<pLines.length){
       const l=pLines[i].trim(); i++;
       if(!l||l.length<2) continue;
       if(isSkip(l)||SEP_RX.test(l)||BARCODE_RX.test(l)) continue;
-      if(/^\d{1,2}[\/.:]\d{2}/.test(l)) continue;
+      if(/^\d{1,2}[\/:.]\d{2}[\/:.]/.test(l)||/^\d{1,2}:\d{2}$/.test(l)) continue; // fecha/hora (require second separator or HH:MM exact)
       if(/^\d{1,3}$/.test(l)) continue; // número suelto de artículos
       if(/^[-–]\s*[^\d]/.test(l)&&l.length<=5) continue; // basura OCR tipo "-リ"
+      if(/^[^ -]{2,}/.test(l)&&l.length<=8) continue; // basura OCR Cyrillic/Asian
 
       // Descuento negativo suelto → aplicar al último producto
       const negM=l.match(NEG_PRICE_RX);
