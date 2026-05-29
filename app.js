@@ -2083,17 +2083,21 @@ function learnFromTicket(t){
       ocr_raw:ocrRaw&&!(ex.ocr_raw||[]).includes(ocrRaw)?[...(ex.ocr_raw||[]),ocrRaw]:(ex.ocr_raw||[])
     };
     // Guardar también índice por rawName normalizado para búsqueda inversa
-    const rawKey=normalizeKey(ocrRaw);
-    if(rawKey&&rawKey!==key){
-      DB.knowledge.products[rawKey]={
-        ...(DB.knowledge.products[rawKey]||{}),
-        person:prod.assignedTo||null,
-        shared:!prod.assignedTo,
-        pct1:prod.pct1||50,
-        alias:prod.name,
-        ocr_raw:[ocrRaw]
-      };
-    }
+    // Strip leading qty ("4 EMPANADO VEGETAL" → "EMPANADO VEGETAL")
+    const ocrStripped=ocrRaw.replace(/^\d+\s+/,'');
+    [ocrRaw, ocrStripped].filter(Boolean).forEach(raw=>{
+      const rk=normalizeKey(raw);
+      if(rk&&rk!==key){
+        DB.knowledge.products[rk]={
+          ...(DB.knowledge.products[rk]||{}),
+          person:prod.assignedTo||null,
+          shared:!prod.assignedTo,
+          pct1:prod.pct1||50,
+          alias:prod.name,
+          ocr_raw:[raw]
+        };
+      }
+    });
   });
 }
 function closeTicketEditor(){document.getElementById('ticket-editor').style.display='none';currentTicket=null;window._lastTicketB64=null;_releerMode=false;}
@@ -2210,12 +2214,19 @@ function settleAccounts(){
     <div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-primary" style="flex:2" onclick="confirmSettle()">Confirmar</button></div>`);
 }
 function confirmSettle(){
+  // Guard: disable button immediately to prevent double-press
+  const btn=document.querySelector('.btn-primary[onclick="confirmSettle()"]');
+  if(btn){btn.disabled=true;btn.style.opacity='0.5';}
   const {owes,amount}=calcBalance();
+  // Re-check: if already settled (amount ~0), just close
+  if(amount<0.01){closeModal();return;}
   const creditor=DB.persons.find(p=>p.id!==owes);
-  DB.settlements.push({id:uid(),date:new Date().toISOString(),msg:`${personName(owes)} pagó ${fmt(amount)} a ${creditor?.name}`,amount,owes});
+  if(!owes||!creditor){closeModal();return;}
+  DB.settlements.push({id:uid(),date:new Date().toISOString(),
+    msg:`${personName(owes)} pagó ${fmt(amount)} a ${creditor.name}`,amount,owes});
   DB.tickets.forEach(t=>{if(t.confirmed)t.settled=true;});
   DB.expenses.forEach(e=>{if(e.confirmed)e.settled=true;});
-  saveDB();closeModal();showToast('Cuentas saldadas',3000);renderBalance();
+  saveDB();closeModal();showToast('¿Está todo Clarito?',3000);renderBalance();
 }
 
 // ── STATS ──────────────────────────────────────────────────────
@@ -2678,9 +2689,11 @@ function answerAIQuestion(qid,answer){
   if(el){el.style.opacity='.4';el.querySelector('.ai-qa-btns').innerHTML='<span style="font-size:12px;color:var(--txt2)">Respondido</span>';}
 }
 async function sendAIMessage(){
+  if(window._aiSending) return; // prevent concurrent sends
   const input=document.getElementById('ai-input');
   const msg=input.value.trim();if(!msg)return;
   input.value='';
+  window._aiSending=true;
   DB.aiConvMessages.push({role:'user',content:msg});renderAIChat();
   // 🥚 Easter egg
   if(/secreto/i.test(msg)){
@@ -2730,7 +2743,13 @@ Responde en español, breve y directo. Si preguntan cuánto gastó alguien, da e
     DB.aiConvMessages.push({role:'bot',content:resp});saveDB();renderAIChat();
     const msgs=document.getElementById('ai-messages');if(msgs)msgs.scrollTop=msgs.scrollHeight;
   }catch(err){
-    DB.aiConvMessages.push({role:'bot',content:'Error: '+err.message});renderAIChat();
+    const errMsg=err.message||'';
+    const isQuota=errMsg.includes('429')||errMsg.includes('quota')||errMsg.includes('rate_limit')||errMsg.includes('exceeded');
+    DB.aiConvMessages.push({role:'bot',content:isQuota?'Se ha excedido la cuota de Groq. Espera un momento antes de volver a preguntar.':'Error: '+errMsg});
+    renderAIChat();
+  } finally {
+    window._aiSending=false;
+    const msgs=document.getElementById('ai-messages');if(msgs)msgs.scrollTop=msgs.scrollHeight;
   }
 }
 function updateAIBadge(){
