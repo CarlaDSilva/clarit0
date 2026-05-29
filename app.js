@@ -674,13 +674,18 @@ function parseTicketText(text){
         end_=i; break;
       }
     }
-    // Also collect prices after TOT (they belong to last products)
+    // Collect prices immediately after TOT (last product prices cut off by TOT line)
+    // But stop at first price that looks like the ticket total (>20€ or repeated)
     const afterTOTprices=[];
-    for(let i=end_;i<Math.min(end_+5,allLines.length);i++){
+    for(let i=end_;i<Math.min(end_+4,allLines.length);i++){
       const t=allLines[i].trim();
-      if(isAlcampoPrice(t)){const p=parseAlcampoPrice(t);if(p>0)afterTOTprices.push(p);}
-      else if(/^tot$/i.test(t)) continue;
-      else if(/^(tarjeta|cambio|num\.)/i.test(t)) break;
+      if(/^tot$/i.test(t)) continue;
+      if(/^(tarjeta|cambio|num\.|para\s+el)/i.test(t)) break;
+      if(isAlcampoPrice(t)){
+        const p=parseAlcampoPrice(t);
+        if(p>0&&p<20) afterTOTprices.push(p); // only small prices (products, not totals)
+        else break; // large price = ticket total, stop
+      } else if(t) break; // text line = stop
     }
 
     const body=allLines.slice(start,end_).map(l=>l.trim()).filter(l=>l);
@@ -762,12 +767,26 @@ function parseTicketText(text){
         continue;
       }
       if(tk.type==='price'){
-        // Orphan price — assign to last entry without price
+        // Orphan price — find best assignment:
+        // 1. Prefer entries whose current price is a "stolen" pack total (override it)
+        // 2. Fall back to entries with no price
         if(entries.length>0){
+          let stolenIdx=-1, nullIdx=-1;
           for(let k2=entries.length-1;k2>=Math.max(0,entries.length-8);k2--){
-            if(entries[k2].price==null&&entries[k2].unitP==null){
-              entries[k2].price=tk.val;break;
+            const e2=entries[k2];
+            if(e2.price==null&&e2.unitP==null&&nullIdx<0) nullIdx=k2;
+            if(e2.price!=null&&e2.unitP==null&&stolenIdx<0){
+              const isStolen=entries.slice(Math.max(0,k2-3),k2+3).some(
+                pe=>pe!==e2&&pe.unitP!=null&&pe.qty>1&&Math.abs(pe.unitP*pe.qty-e2.price)<0.02
+              );
+              if(isStolen) stolenIdx=k2;
             }
+          }
+          // Prefer stolen (more recent = higher index) over null
+          if(stolenIdx>=0&&(nullIdx<0||stolenIdx>nullIdx)){
+            entries[stolenIdx].price=tk.val;
+          } else if(nullIdx>=0){
+            entries[nullIdx].price=tk.val;
           }
         }
         j++; continue;
@@ -1784,17 +1803,12 @@ function renderProductRow(prod,i){
   }).join('');
 
   if(_releerMode){
-    return`<label class="product-row" style="cursor:pointer" for="releer-check-${i}">
-      <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
-        <input type="checkbox" id="releer-check-${i}" data-idx="${i}"
-          style="width:22px;height:22px;flex-shrink:0;accent-color:var(--green)"
-          onchange="this.closest('.product-row').style.opacity=this.checked?'1':'0.45'">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:500;color:var(--txt0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${prod.name||'Sin nombre'}</div>
-          <div style="font-size:12px;color:var(--txt2)">${prod.qty>1?prod.qty+'u · ':''}${prod.unitPrice>0?prod.unitPrice.toFixed(2)+' €/u':''}</div>
-        </div>
-      </div>
-    </label>`;
+    return`<div id="releer-card-${i}" data-idx="${i}" data-selected="0"
+      onclick="toggleReleerCard(${i})"
+      style="margin:6px 16px;padding:12px;border-radius:var(--rad-sm);border:2px solid var(--brd);background:var(--bg2);cursor:pointer;opacity:0.5;transition:all .15s">
+      <div style="font-size:14px;font-weight:500;color:var(--txt0)">${prod.name||'Sin nombre'}</div>
+      <div style="font-size:12px;color:var(--txt2);margin-top:2px">${prod.qty>1?prod.qty+'u · ':''}${prod.unitPrice>0?prod.unitPrice.toFixed(2)+' €/u':''}</div>
+    </div>`;
   }
   return`<div class="product-row" id="prod-${i}">
     <div class="product-top">
@@ -1875,19 +1889,28 @@ function removeProduct(i){currentTicket.products.splice(i,1);renderProductsList(
 function addEmptyProduct(){currentTicket.products.push({rawName:'',name:'',price:0,finalPrice:0,qty:1,confidence:1,category:'otro',assignedTo:null,shared:true,pct1:50});renderProductsList();setTimeout(()=>{const l=document.querySelectorAll('.product-row');if(l.length)l[l.length-1].scrollIntoView({behavior:'smooth'});},100);}
 function setTicketPayer(id){currentTicket.payer=id;if(currentTicket.last4)DB.knowledge.cards[currentTicket.last4]=id;renderTicketEditor();}
 function dismissErrors(){currentTicket.errors=[];currentTicket.warnings=[];renderTicketEditor();}
+function toggleReleerCard(i){
+  const card=document.getElementById('releer-card-'+i);
+  if(!card) return;
+  const sel=card.dataset.selected==='1';
+  card.dataset.selected=sel?'0':'1';
+  card.style.opacity=sel?'0.5':'1';
+  card.style.borderColor=sel?'var(--brd)':'var(--green)';
+  card.style.background=sel?'var(--bg2)':'var(--bg3)';
+}
 function activarReleer(){
   _releerMode=true;
   renderTicketEditor();
-  showToast('Marca los productos correctos y pulsa Enviar',3000);
+  showToast('Toca los productos correctos · pulsa Enviar',3000);
 }
 
 async function enviarReleer(){
   if(!DB.groqKey||!window._lastTicketB64){showToast('Necesitas Groq Key e imagen del ticket');return;}
-  // Collect checked products
+  // Collect selected product cards
   const confirmed=[];
-  document.querySelectorAll('[id^="releer-check-"]').forEach(cb=>{
-    if(cb.checked){
-      const idx=parseInt(cb.dataset.idx);
+  document.querySelectorAll('[id^="releer-card-"]').forEach(card=>{
+    if(card.dataset.selected==='1'){
+      const idx=parseInt(card.dataset.idx);
       const p=currentTicket.products[idx];
       if(p) confirmed.push(p);
     }
@@ -2324,11 +2347,11 @@ function renderSettings(){
         <div class="settings-row" onclick="resetAll()"><div class="settings-label" style="color:var(--red)">Borrar todos los datos</div></div>
       </div>
     </div>
-    <div style="margin:0 16px 16px"><button class="btn-secondary" style="width:100%" onclick="location.reload()">Actualizar app</button></div>
+    <div style="margin:0 16px 16px"><button class="btn-secondary" style="width:100%" onclick="DB.aiConvMessages=[];saveDB();location.reload()">Actualizar app</button></div>
     `:''}
     ${DB.devMode?`<div style="margin:0 16px 16px"><button class="btn-secondary" style="width:100%;color:var(--txt2);font-size:13px" onclick="DB.devMode=false;S.set('devMode',false);saveDB();renderSettings();showToast('Modo desarrollador desactivado')">Ocultar opciones de desarrollador</button></div>`:''}
-    <div class="settings-section">
-      <div class="settings-section-title">Estadísticas</div>
+    ${DB.devMode?`<div class="settings-section">
+      <div class="settings-section-title">Estadísticas 🛠</div>
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="resetStatsConfirm()">
           <div class="settings-icon" style="background:#1a1a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg></div>
@@ -2336,7 +2359,7 @@ function renderSettings(){
           <div class="settings-arrow">›</div>
         </div>
       </div>
-    </div>
+    </div>`:''}
     <p style="text-align:center;font-size:11px;color:var(--txt3);padding:20px">Clarito · Datos guardados localmente</p>
   `;
 }
@@ -2691,6 +2714,8 @@ function generateAIQuestions(ticket){
 
 // ── BOOT ──────────────────────────────────────────────────────
 loadDB();
+DB.aiConvMessages=[];saveDB();
+expireOldTickets();
 setTimeout(()=>{
   hideSplash();
   setTimeout(()=>{
