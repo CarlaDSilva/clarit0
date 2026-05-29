@@ -362,6 +362,10 @@ function parseTicketText(text){
     lines.some(l=>QTY_OPEN_RX.test(l));
   const isFroiz = store.toLowerCase().includes('froiz') ||
     lines.some(l=>/distribuciones froiz/i.test(l));
+  // Mercadona digital: tiene cabecera "Descripción" + "P. Unit" en líneas consecutivas
+  const isMercadonaDigital = (store.toLowerCase().includes('mercadona')||lines.some(l=>/mercadona/i.test(l))) &&
+    lines.some((l,i)=>(/descripci[oó]n/i.test(l)&&i+1<lines.length&&/p\.\s*unit/i.test(lines[i+1]))||
+                       /descripci[oó]n.*p\.\s*unit/i.test(l));
 
   // ── Detectar fecha y hora ─────────────────────────────────────
   let date=null, time=null;
@@ -405,7 +409,7 @@ function parseTicketText(text){
   let total=0;
   // Prioridad 1: IMPORTE / IMP. (línea más fiable)
   for(const l of lines){
-    const m=l.match(/imp(?:orte)?[\s.]*(?:eur[\s.]*)?[.:]\s*(\d{1,4}[.,]\d{2})/i);
+    const m=l.match(/imp(?:orte)?[\s.]*(?:eur[\s.]*)?[.:]\s*(\d{1,4}[.,]\d{2})/i)||l.match(/importe:\s*(\d{1,4}[.,]\d{2})\s*[€]/i);
     if(m){const v=parseFloat(m[1].replace(',','.'));if(v>0){total=v;break;}}
   }
   // Prioridad 2: *Total: o ART.TOTAL con precio inline o en línea siguiente
@@ -469,7 +473,7 @@ function parseTicketText(text){
   for(const l of lines){
     // Formatos de tarjeta enmascarada: "479343XXXXXX0925", "XXXXXXXXXXXX0925", "XXXXXXXXXXXX0925 00"
     // Regla: debe haber al menos 4 X/*/• consecutivas seguidas de exactamente 4 dígitos al final
-    const m=l.match(/(?:\d{4,6})?[Xx*•]{4,}(\d{4})\b/)||   // "479343XXXXXX0925" o "XXXX0925"
+    const m=l.match(/(?:\d{4,6})?[Xx*•]{4,}\s*(\d{4})\b/)||   // "479343XXXXXX0925" o "XXXX0925"
              l.match(/^[Xx\s*•]+(\d{4})\s*(?:\d{2})?\s*$/)||// "XXXX0925 00"
              l.match(/tarjeta[^\d]*(\d{4})/i)||
              l.match(/(?:visa|mastercard|maestro|amex|debit)\s+\d*[Xx*•]+(\d{4})/i);
@@ -478,7 +482,7 @@ function parseTicketText(text){
 
   // ── Cortar en línea de total / impuestos ──────────────────────
   // Todo lo que viene después de la primera línea de corte no es producto
-  const CUT_RX=/^(total[\s.]*$|art\.?[\s.]*total[\s\w]*|total[\s.]*a[\s.]*p\w+|tipo\s*$|====+|base\s*$|cuota\s*$)/i;
+  const CUT_RX=/^(total[\s.(]*[€$)]*$|art\.?[\s.]*total[\s\w]*|total[\s.]*a[\s.]*p\w+|tipo\s*$|====+|base\s*$|cuota\s*$|entrada\b|salida\b)/i;
   // Pre-detectar formato Lidl columnas antes de cortar
   // En Lidl columnas los precios B/A vienen DESPUÉS de TOTAL — no cortar en TOTAL
   // Detectar Lidl columnas inline (sin usar LIDL_PRICE_RX que aún no está declarado)
@@ -513,6 +517,8 @@ function parseTicketText(text){
 
   if(isFroiz){
     parseFroiz(lines, products); // Froiz usa todas las líneas, no solo productLines
+  } else if(isMercadonaDigital){
+    parseMercadonaDigital(lines, products);
   } else if(isCarrefour){
     parseCarrefour(productLines, products);
   } else {
@@ -532,6 +538,72 @@ function parseTicketText(text){
   //  - Un número entero suelto antes del código puede ser qty del producto anterior (pack)
   //  - Precio correcto = primer precio después del código interno
   // ══════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════
+  //  FORMATO MERCADONA DIGITAL (captura de pantalla ticket digital)
+  //  Estructura: cabecera "Descripción P. Unit Importe"
+  //  Líneas: "N NOMBRE" → precio_unit → [precio_total si qty>1]
+  //  Los productos sin precio propio reciben el precio del siguiente bloque
+  // ══════════════════════════════════════════════════════════════
+  function parseMercadonaDigital(allLines, out){
+    // Encontrar inicio (después de "Descripción P. Unit Importe")
+    let start=0;
+    for(let i=0;i<allLines.length;i++){
+      if(/descripci[oó]n/i.test(allLines[i])&&/p\.\s*unit/i.test(allLines[i])){start=i+1;break;}
+      if(/descripci[oó]n/i.test(allLines[i])&&i+2<allLines.length&&/p\.\s*unit/i.test(allLines[i+1])){start=i+3;break;} // sep lines
+      if(/p\.\s*unit/i.test(allLines[i])&&i>0&&/descripci[oó]n/i.test(allLines[i-1])){start=i+2;break;}
+    }
+    // Cortar en TOTAL
+    let end_=allLines.length;
+    for(let i=start;i<allLines.length;i++){
+      if(/^total\s*[\(€)]/i.test(allLines[i].trim())||/^entrada\b/i.test(allLines[i].trim())){end_=i;break;}
+    }
+    const body=allLines.slice(start,end_);
+
+    // Recoger entradas: {name, qty}
+    const entries=[];
+    const QTY_NAME_RX=/^(\d+)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\/\-'.]+)$/;
+    for(const l of body){
+      const t=l.trim();
+      if(!t||t.length<2) continue;
+      if(isPrice(t)||/^[0-9,.]+$/.test(t)) continue;
+      if(isSkip(t)||BARCODE_RX.test(t)||SEP_RX.test(t)) continue;
+      if(/^(op:|factura|tel[eé]f|entrada|salida|parking|descripci[oó]n)/i.test(t)) continue;
+      const m=t.match(QTY_NAME_RX);
+      if(m){entries.push({name:m[2].trim(),qty:parseInt(m[1]),raw:t});}
+      else if(/^[A-ZÁÉÍÓÚÑ]/.test(t)&&t.length>=3){entries.push({name:t,qty:1,raw:t});}
+    }
+
+    // Recoger precios (excluir 0,00 de parking y valores de IVA)
+    // Los precios vienen en pares [unit, total] cuando qty>1, o solos cuando qty=1
+    const allPrices=[];
+    let pastTotal=false;
+    for(const l of body){
+      const t=l.trim();
+      if(/^(entrada|salida)/i.test(t)){pastTotal=true;continue;}
+      if(pastTotal) continue;
+      // Precio: número decimal con coma o punto, puede ser 0,00
+      const pm=t.match(/^(\d{1,4}[.,]\d{2})$/);
+      if(pm) allPrices.push(parseFloat(pm[1].replace(',','.')));
+    }
+
+    // Asignar precios a entradas
+    // Para qty=1: consume 1 precio (el unit)
+    // Para qty>1: consume 2 precios (unit + total), usar el unit
+    let pi=0;
+    for(const e of entries){
+      if(pi>=allPrices.length) break;
+      const unitP=allPrices[pi]; pi++;
+      if(unitP===0&&e.name.toUpperCase().includes('PARKING')) continue; // skip parking
+      if(e.qty>1&&pi<allPrices.length){
+        // Siguiente precio es el total de línea — verificar
+        const lineTotal=allPrices[pi];
+        if(Math.abs(lineTotal-unitP*e.qty)<0.02) pi++; // consumir el total
+      }
+      const nm=cleanName(e.name);
+      if(nm.length>=2) out.push(makeProduct(nm,e.raw,unitP,e.qty));
+    }
+  }
+
   function parseFroiz(allLines, out){
     const FROIZ_CODE_RX=/^\d{5,}\.?\s*\d*$/;
     const FROIZ_CUT_RX=/^(\*?total\b|entrega:|tarjetas:|a\s+devolver|base\s+c\.iva)/i;
@@ -1616,12 +1688,9 @@ function learnFromTicket(t){
 function closeTicketEditor(){document.getElementById('ticket-editor').style.display='none';currentTicket=null;}
 function deleteCurrentTicket(){
   if(!currentTicket) return;
-  // Store id in window var to avoid quote escaping issues
   window._deleteTicketId=currentTicket.id;
   const t=currentTicket;
-  const hasProducts=t.products&&t.products.length>0;
-  const checkboxHtml=hasProducts?'<label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:14px;color:var(--txt1)"><input type="checkbox" id="del-knowledge" style="width:18px;height:18px"> Eliminar también los productos aprendidos de este ticket</label>':'';
-  openModal('<div class="modal-title">Eliminar ticket</div><p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:16px">¿Eliminar el ticket de '+(t.store||'este supermercado')+'?</p>'+checkboxHtml+'<div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="confirmDeleteTicket()">Eliminar</button></div>');
+  openModal('<div class="modal-title">Eliminar ticket</div><p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:16px">¿Eliminar el ticket de '+(t.store||'este supermercado')+'?</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="confirmDeleteTicket()">Eliminar</button></div>');
 }
 function confirmDeleteTicket(){
   const id=window._deleteTicketId;
@@ -1897,6 +1966,16 @@ function renderSettings(){
     <div style="margin:0 16px 16px"><button class="btn-secondary" style="width:100%" onclick="location.reload()">Actualizar app</button></div>
     `:''}
     ${DB.devMode?`<div style="margin:0 16px 16px"><button class="btn-secondary" style="width:100%;color:var(--txt2);font-size:13px" onclick="DB.devMode=false;S.set('devMode',false);saveDB();renderSettings();showToast('Modo desarrollador desactivado')">Ocultar opciones de desarrollador</button></div>`:''}
+    <div class="settings-section">
+      <div class="settings-section-title">Estadísticas</div>
+      <div style="background:var(--bg1)">
+        <div class="settings-row" onclick="resetStatsConfirm()">
+          <div class="settings-icon" style="background:#1a1a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg></div>
+          <div class="settings-label">Nuevo mes / Resetear stats</div>
+          <div class="settings-arrow">›</div>
+        </div>
+      </div>
+    </div>
     <p style="text-align:center;font-size:11px;color:var(--txt3);padding:20px">Clarito · Datos guardados localmente</p>
   `;
 }
@@ -2109,6 +2188,15 @@ function editGroqKey(){openModal(`<div class="modal-title">Groq API Key</div><p 
 function editOcrKey(){openModal(`<div class="modal-title">API Key de OCR.space</div><p style="font-size:13px;color:var(--txt2);margin-bottom:4px">Key gratuita en <strong style="color:var(--accent)">ocr.space/ocrapi</strong></p><p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Deja <em>helloworld</em> para usar la key demo (limitada)</p><input type="password" id="new-ocrkey" value="${DB.ocrKey||'helloworld'}" placeholder="helloworld"/><div style="display:flex;gap:10px;margin-top:16px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-primary" style="flex:2" onclick="const k=document.getElementById('new-ocrkey').value.trim()||'helloworld';DB.ocrKey=k;S.set('ocrKey',k);saveDB();closeModal();showToast('Guardada');renderSettings()">Guardar</button></div>`);}
 
 function exportData(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='clarito-'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+function resetStatsConfirm(){
+  openModal('<div class="modal-title">Resetear estadísticas</div><p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:16px">Esto eliminará todos los tickets y gastos actuales, como si empezaras un mes nuevo. No afecta a los productos aprendidos ni a la configuración.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="doResetStats()">Resetear</button></div>');
+}
+function doResetStats(){
+  DB.tickets=[];
+  DB.expenses=[];
+  DB.settlements=[];
+  saveDB();closeModal();showToast('Estadísticas reseteadas');renderPage(currentScreen);
+}
 function resetAll(){openModal(`<div class="modal-title">¿Borrar todo?</div><p style="font-size:14px;color:var(--txt1);margin-bottom:20px">No se puede deshacer.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="localStorage.clear();location.reload()">Borrar todo</button></div>`);}
 
 // ── AI CHAT ────────────────────────────────────────────────────
