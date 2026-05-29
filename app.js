@@ -1785,7 +1785,7 @@ function renderTicketEditor(){
     </div>
     <div class="te-footer">
       <button class="btn-secondary" style="flex:1" onclick="closeTicketEditor()">Cancelar</button>
-      ${DB.groqKey&&window._lastTicketB64?(_releerMode?"<button class='btn-primary' style='flex:1.5' onclick='enviarReleer()'>Enviar</button>":"<button class='btn-secondary' style='flex:1' onclick='activarReleer()'>Releer</button>"):""}
+      ${DB.groqKey&&window._lastTicketB64?(_releerMode?"<button class='btn-secondary' style='flex:1' onclick='seleccionarTodoReleer()'>Todas</button><button class='btn-primary' style='flex:1.5' onclick='enviarReleer()'>Enviar</button>":"<button class='btn-secondary' style='flex:1' onclick='activarReleer()'>Releer</button>"):""}
       <button class="btn-primary" style="flex:2" onclick="saveTicket()">Guardar</button>
     </div>`;
 }
@@ -1809,20 +1809,29 @@ function renderProductRow(prod,i){
   }).join('');
 
   if(_releerMode){
-    // Same structure as normal product row but tappable + selection state
-    const unitDisplay=unitPrice>0?unitPrice.toFixed(2):'';
     return`<div class="product-row" id="releer-card-${i}" data-idx="${i}" data-selected="0"
       onclick="toggleReleerCard(${i})"
-      style="cursor:pointer;opacity:0.45;transition:opacity .15s,border-color .15s;border:2px solid transparent">
-      <div style="flex:1;min-width:0">
-        <input value="${prod.name||''}" readonly style="background:transparent;border:none;font-size:14px;font-weight:500;color:var(--txt0);width:100%;pointer-events:none"/>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-          <span style="font-size:11px;color:var(--txt3)">${prod.qty>1?prod.qty+'×':''}</span>
-          ${prod.category?`<span class="cat-badge" style="pointer-events:none">${prod.category}</span>`:''}
+      style="cursor:pointer;opacity:0.45;transition:opacity .15s;border:2px solid transparent;border-radius:var(--rad-sm)">
+      <div class="product-top" style="pointer-events:none">
+        <div class="confidence-dot ${confClass}"></div>
+        <div class="product-name-wrap">
+          <div style="font-size:14px;font-weight:500;color:var(--txt0)">${prod.name||''}</div>
+          ${prod.rawName&&prod.rawName!==prod.name?`<div class="product-name-raw">${prod.rawName}</div>`:''}
         </div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
-        <span style="font-size:12px;font-weight:700;color:var(--txt0)">${unitDisplay?unitDisplay+' €':''}</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:11px;color:var(--txt2)">u/</span>
+            <span style="font-size:12px;color:var(--txt0);width:64px;text-align:right">${unitDisplay}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:12px;color:var(--txt2);min-width:20px;text-align:center">${qty>1?qty+'×':''}</span>
+            ${hasDiscount
+              ?`<span style="font-size:10px;color:var(--txt3);text-decoration:line-through">${(unitPrice*qty).toFixed(2)} €</span>`
+              :qty>1?`<span style="font-size:10px;color:var(--txt3)">${unitPrice.toFixed(2)} €</span>`
+              :''}
+            <span style="font-size:${(hasDiscount||qty>1)?'15':'12'}px;font-weight:700;color:${hasDiscount?'var(--green)':'var(--txt0)'};min-width:38px;text-align:right">${total>0?total.toFixed(2)+' €':''}</span>
+          </div>
+        </div>
       </div>
     </div>`;
   }
@@ -1851,7 +1860,7 @@ function renderProductRow(prod,i){
           <button onclick="changeQty(${i},1)" style="width:22px;height:22px;border-radius:50%;background:var(--bg4);color:var(--txt1);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
           ${hasDiscount
             ?`<span style="font-size:10px;color:var(--txt3);text-decoration:line-through;text-align:right">${(unitPrice*qty).toFixed(2)} €</span>`
-            :qty>1?`<span style="font-size:10px;color:var(--txt3);text-align:right">${unitPrice.toFixed(2)} €/u</span>`
+            :qty>1?`<span style="font-size:10px;color:var(--txt3);text-align:right">${unitPrice.toFixed(2)} €</span>`
             :''}
           <span id="total-${i}" style="font-size:${(hasDiscount||qty>1)?'15':'12'}px;font-weight:700;color:${hasDiscount?'var(--green)':'var(--txt0)'};min-width:38px;text-align:right">${total>0?total.toFixed(2)+' €':''}</span>
         </div>
@@ -1919,7 +1928,18 @@ function toggleReleerCard(i){
 function activarReleer(){
   _releerMode=true;
   renderTicketEditor();
-  showToast('Toca los productos correctos · pulsa Enviar',3000);
+  showToast('Toca los productos correctos y pulsa Enviar',3000);
+}
+function seleccionarTodoReleer(){
+  const cards=document.querySelectorAll('[id^="releer-card-"]');
+  // If all selected → deselect all; otherwise select all
+  const allSel=[...cards].every(c=>c.dataset.selected==='1');
+  cards.forEach(card=>{
+    const idx=parseInt(card.dataset.idx);
+    card.dataset.selected=allSel?'0':'1';
+    card.style.opacity=allSel?'0.45':'1';
+    card.style.borderColor=allSel?'transparent':'var(--green)';
+  });
 }
 
 async function enviarReleer(){
