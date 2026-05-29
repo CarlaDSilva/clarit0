@@ -600,86 +600,80 @@ function parseTicketText(text){
     }
     const body=allLines.slice(start,end_);
 
-    // Recoger entradas: {name, qty}
-    const entries=[];
-    const QTY_NAME_RX=/^(\d+)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9\s\/\-'.%&C]+)$/;
-    for(const l of body){
-      const t=l.trim();
-      if(!t||t.length<2) continue;
-      if(isPrice(t)||/^[0-9,.]+$/.test(t)) continue;
-      if(isSkip(t)||BARCODE_RX.test(t)||SEP_RX.test(t)) continue;
-      if(/^(op:|factura|tel[eé]f|entrada|salida|parking|descripci[oó]n|uf\ |jati|шп|siso|utillos)/i.test(t)) continue;
-      if(/^[a-záéíóúñ]{2,}\s+[a-z]/i.test(t)&&t.length>8&&!/^\d/.test(t)&&!QTY_NAME_RX.test(t)) continue; // OCR garbage
-      const m=t.match(QTY_NAME_RX);
-      if(m){entries.push({name:m[2].trim(),qty:parseInt(m[1]),raw:t});}
-      else if(/^[A-ZÁÉÍÓÚÑ]/.test(t)&&t.length>=3){entries.push({name:t,qty:1,raw:t});}
-    }
 
-    // Regex para detectar línea con precio inline al final
-    const INLINE_PRICE_RX=/^(\d+)\s+(.+?)\s+(\d{1,3}[.,]\d{2})$/;
-    // Recoger entradas y precios, manejando formato inline "2 NATA 15% SIN LACTOSA 2,40"
-    const inlineEntries=[]; // {name, qty, unitPrice} — para productos con precio inline
+
+    // Pre-process body: expand inline "N NOMBRE PRECIO" lines into (entry, price) pairs
+    // so they appear in correct position. Build a unified entries[] and allPrices[] together.
+    const QTY_INLINE_RX=/^(\d+)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ0-9\s\/\-'.%&]+?)\s+(\d{1,3}[.,]\d{2})$/;
+    const entries=[];
     const allPrices=[];
-    let pastTotal=false;
-    const revisedBody=[];
+
     for(const l of body){
       const t=l.trim();
-      if(/^(entrada|salida)/i.test(t)){pastTotal=true;revisedBody.push(l);continue;}
-      if(pastTotal){revisedBody.push(l);continue;}
-      // Check if line has inline price: "2 NOMBRE PRECIO"
-      const inlineM=t.match(INLINE_PRICE_RX);
+      if(/^(entrada|salida)/i.test(t)) continue;
+      // Inline: "2 NATA 15% SIN LACTOSA 2,40" — name and unit price on same line
+      const inlineM=t.match(QTY_INLINE_RX);
       if(inlineM){
-        const qty=parseInt(inlineM[1]);
-        const name=inlineM[2].trim();
-        const unitPrice=parseFloat(inlineM[3].replace(',','.'));
-        // Only treat as inline if name looks like a product (starts uppercase)
-        if(/^[A-ZÁÉÍÓÚÑ\d]/.test(name)&&name.length>=3&&qty>=1&&qty<=99){
-          inlineEntries.push({name,qty,unitPrice,raw:t,skipNextTotal:parseFloat((unitPrice*qty).toFixed(2))});
-          revisedBody.push(l);
+        const qty=parseInt(inlineM[1]),name=inlineM[2].trim();
+        const unitP=parseFloat(inlineM[3].replace(',','.'));
+        if(name.length>=3&&qty>=1&&qty<=99){
+          entries.push({name,qty,raw:t,_inlinePrice:unitP});
+          // The next line will be the line total (qty*unitP) — mark to skip it
+          allPrices.push({v:unitP,isInlineUnit:true,skipTotal:parseFloat((unitP*qty).toFixed(2))});
           continue;
         }
       }
-      // Precio: número decimal con coma o punto, puede ser 0,00
+      // Normal price line
       const pm=t.match(/^(\d{1,4}[.,]\d{2})$/);
       if(pm){
         const v=parseFloat(pm[1].replace(',','.'));
-        // Skip if this is the line-total of an inline entry
-        const isInlineTotal=inlineEntries.some(e=>{
-          if(e._totalConsumed) return false;
-          if(Math.abs(e.skipNextTotal-v)<0.02){e._totalConsumed=true;return true;}
-          return false;
-        });
-        if(!isInlineTotal) allPrices.push(v);
+        // Skip if it's the line total of the last inline entry
+        const last=allPrices[allPrices.length-1];
+        if(last&&last.isInlineUnit&&Math.abs(last.skipTotal-v)<0.02){continue;}
+        allPrices.push({v});
+        continue;
       }
-      revisedBody.push(l);
+      // Product name line
+      const QTY_NAME_RX=/^(\d+)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9\s\/\-'.%&C]+)$/;
+      const m=t.match(QTY_NAME_RX);
+      if(m){entries.push({name:m[2].trim(),qty:parseInt(m[1]),raw:t});continue;}
+      if(/^[A-ZÁÉÍÓÚÑ]/.test(t)&&t.length>=3&&!isPrice(t)&&
+         !/^(op:|factura|tel[eé]f|entrada|salida|parking|descripci[oó]n|uf\ |jati|шп|siso|utillos)/i.test(t)&&
+         !/^[a-záéíóúñ]{2,}\s+[a-z]/i.test(t)){
+        entries.push({name:t,qty:1,raw:t});
+      }
     }
 
-    // Asignar precios a entradas
+    // Build flat price list (only real prices, not inline unit markers)
+    const flatPrices=allPrices.filter(p=>!p.isInlineUnit).map(p=>p.v);
+
+    // Assign prices to entries
     let pi=0;
     const pendingEntries=[];
     for(const e of entries){
-      if(pi>=allPrices.length){pendingEntries.push(e);continue;}
-      const unitP=allPrices[pi]; pi++;
+      if(e._inlinePrice!=null){
+        // Inline entry: already has its price
+        const nm=cleanName(e.name);
+        if(nm.length>=2) out.push(makeProduct(nm,e.raw,e._inlinePrice,e.qty));
+        continue;
+      }
+      if(pi>=flatPrices.length){pendingEntries.push(e);continue;}
+      const unitP=flatPrices[pi]; pi++;
       if(unitP===0&&e.name.toUpperCase().includes('PARKING')) continue;
-      if(e.qty>1&&pi<allPrices.length){
-        const lineTotal=allPrices[pi];
+      if(e.qty>1&&pi<flatPrices.length){
+        const lineTotal=flatPrices[pi];
         if(Math.abs(lineTotal-unitP*e.qty)<0.02) pi++;
       }
       const nm=cleanName(e.name);
       if(nm.length>=2) out.push(makeProduct(nm,e.raw,unitP,e.qty));
     }
-    // Assign afterTotalPrices to pending entries (products without prices in the main body)
+    // Assign afterTotalPrices to pending entries
     let api=0;
     for(const e of pendingEntries){
       if(api>=afterTotalPrices.length) break;
       const unitP=afterTotalPrices[api]; api++;
       const nm=cleanName(e.name);
       if(nm.length>=2) out.push(makeProduct(nm,e.raw,unitP,e.qty));
-    }
-    // Add inline entries (products with price on same line)
-    for(const e of inlineEntries){
-      const nm=cleanName(e.name);
-      if(nm.length>=2) out.push(makeProduct(nm,e.raw,e.unitPrice,e.qty));
     }
   }
 
@@ -1189,6 +1183,13 @@ function parseTicketText(text){
         packUnit=m?parseFloat(m[1].replace(',','.')):null; j++;
         if(j<nameLines.length&&/^\d+$/.test(nameLines[j].trim())){packQty=parseInt(nameLines[j].trim());j++;}
       }
+      // Detect "1,09x" — unit price marker meaning this product has qty=2
+      // The total price (2,18) will be in the price block and tells us qty=round(total/unit)
+      if(j<nameLines.length&&/^\d{1,3}[.,]\d{2}[xX]$/.test(nameLines[j].trim())){
+        const m=nameLines[j].trim().match(/^(\d{1,3}[.,]\d{2})/);
+        if(m) packUnit=parseFloat(m[1].replace(',','.'));
+        j++;
+      }
       entries.push({raw:l, qty:packQty, unitPrice:packUnit, kgInfo});
     }
 
@@ -1207,7 +1208,12 @@ function parseTicketText(text){
       const nm=cleanName(e.raw);
       if(nm.length<2) continue;
       if(e.kgInfo) out.push(makeProduct(nm,e.raw,price,1));
-      else if(e.qty>1&&e.unitPrice) out.push(makeProduct(nm,e.raw,e.unitPrice,e.qty));
+      else if(e.unitPrice){
+        // unitPrice set from pack or x-marker: calculate qty from total price
+        const qty=e.qty>1?e.qty:Math.max(1,Math.round(price/e.unitPrice));
+        if(qty>=2&&Math.abs(e.unitPrice*qty-price)<0.02) out.push(makeProduct(nm,e.raw,e.unitPrice,qty));
+        else out.push(makeProduct(nm,e.raw,price,1));
+      }
       else out.push(makeProduct(nm,e.raw,price,1));
     }
   }
@@ -1303,9 +1309,28 @@ function parseTicketText(text){
 
     // Recoger todos los precios positivos B/A en orden de documento
     const posPrices=[];
-    for(const l of lines){
-      const t=l.trim();
+    // Collect x-markers: "1,09x" means the entry just before it has qty>1
+    // We'll process x-markers after building entries
+    const rawXMarkers=[]; // {unitP, lineIdx}
+    for(let li=0;li<lines.length;li++){
+      const t=lines[li].trim();
       if(LIDL_PRICE_RX.test(t)){const p=parseLidlPrice(t);if(p!=null&&p>0)posPrices.push(p);}
+      else if(/^\d{1,3}[.,]\d{2}[xX]$/.test(t)){
+        const unitP=parseFloat(t.replace(/[xX]/,'').replace(',','.'));
+        rawXMarkers.push({unitP,lineIdx:li});
+      }
+    }
+
+    // Map x-markers to entry indices: x-marker appears after the name in the name section
+    // Find which entry each x-marker belongs to by checking which entry name comes just before it
+    const xByEntry={};
+    for(const xm of rawXMarkers){
+      // Find the entry whose name appears closest before this x-marker in the lines
+      for(let k=entries.length-1;k>=0;k--){
+        const entryName=entries[k].name.toUpperCase();
+        const nameLineIdx=lines.findIndex((l,li)=>li<xm.lineIdx&&l.trim().toUpperCase().includes(entryName));
+        if(nameLineIdx>=0){xByEntry[k]=xm.unitP;break;}
+      }
     }
 
     // Parear nombres con precios positivos por posición
@@ -1315,6 +1340,15 @@ function parseTicketText(text){
       if(price==null) continue;
       const nm=cleanName(e.name);
       if(nm.length<2) continue;
+      // Check if there's an x-marker for this entry
+      const unitP=xByEntry[k];
+      if(unitP){
+        const qty=Math.round(price/unitP);
+        if(qty>=2&&Math.abs(unitP*qty-price)<0.02){
+          out.push(makeProduct(nm,e.name,unitP,qty));
+          continue;
+        }
+      }
       out.push(makeProduct(nm,e.name,price,1));
     }
 
@@ -2321,7 +2355,7 @@ function confirmSettle(){
   // Also save settled IDs separately as backup
   const settledIds=DB.tickets.filter(t=>t.settled).map(t=>t.id);
   S.set('settledTicketIds',settledIds);
-  saveDB();closeModal();showToast('¿Está todo Clarito?',3000);currentScreen='balance';renderBalance();
+  saveDB();closeModal();showToast('¡Todo Clarito!',3000);currentScreen='balance';renderBalance();
 }
 
 // ── STATS ──────────────────────────────────────────────────────
