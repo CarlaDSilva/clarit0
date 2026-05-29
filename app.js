@@ -620,129 +620,183 @@ function parseTicketText(text){
   //  - Ruido: "4 x", "92", "A", "B", "ESP", "TOT", "€*", ",XX" (sin 0 inicial)
   // ══════════════════════════════════════════════════════════════
   function parseAlcampo(allLines, out){
-    const ALCAMPO_PRICE_RX=/^,?\d{1,3}[.,]\d{2}\s*[ABC]?\s*$/;  // ",96 B" o "1,61 B" o "3,68"
-    const ALCAMPO_PACK_RX=/^(\d+)\s*[xX]\s*(\d{1,3}[.,]\d{2})$/; // "2 x 1,00"
-    const ALCAMPO_SKIP_RX=/^(factura|simplificada|tarjeta|cambio|num\.|imp\.|base|cuota|iva|para\s+el|establecimiento|localidad|fecha|numero|tipo\s+de|codigo|importe\s+moneda|verificacion|etiqueta|n\.\s*referencia|entidad|pin|firma|a\s+tu|campaña|con\s+\d|consigue|descuento|sellos|puc|arc:|aid|alcampo\s+s\.a|santiago|tot$|€\*)/i;
-    const NOISE_RX=/^(\d+\s*x\s*$|[ABC]$|92$|€\*$|tot$|esp$|\d{2}$)/i;
+    const ALCAMPO_PRICE_RX=/^,?\d{1,3}[.,]\d{2}\s*[ABC]?\s*$/;
+    const ALCAMPO_PACK_RX=/^(\d+)\s*[xX]\s*(\d{1,3}[.,]\d{2})$/;
+    const QTY_ONLY_RX=/^(\d+)\s*[xX]\s*$/; // "4 x" sin precio — qty del siguiente producto
+    const ALCAMPO_SKIP_RX=/^(factura|simplificada|tarjeta|cambio|num\.|base|cuota|para\s+el|establecimiento|localidad|fecha|numero|tipo\s+de|codigo|importe\s+moneda|verificacion|etiqueta|n\.\s*referencia|entidad|pin|firma|a\s+tu|campa|con\s+\d|consigue|descuento|sellos|puc|arc:|aid|alcampo\s+s\.a|santiago|tot$|€\*)/i;
+    const NOISE_RX=/^([ABC]$|92$|€\*$|tot$|esp$|\d{2}$|\d+\s*[xX]\s*$)/i; // incl. '4 x'
 
     function isAlcampoPrice(l){
-      if(ALCAMPO_PRICE_RX.test(l)) return true;
-      // Precio truncado sin cero: ",96 B"
-      if(/^,\d{2}\s*[ABC]?$/.test(l)) return true;
-      return false;
+      return ALCAMPO_PRICE_RX.test(l)||/^,\d{2}\s*[ABC]?$/.test(l);
     }
     function parseAlcampoPrice(l){
-      const clean=l.replace(/[ABC\s]/g,'').replace(',','.');
-      // Handle ",96" → "0.96"
-      if(clean.startsWith('.')) return parseFloat('0'+clean);
-      return parseFloat(clean);
+      const c=l.replace(/[ABC\s]/g,'').replace(',','.');
+      return c.startsWith('.')?parseFloat('0'+c):parseFloat(c);
     }
     function isAlcampoName(l){
       if(!l||l.length<3) return false;
-      if(isAlcampoPrice(l)||ALCAMPO_PACK_RX.test(l)) return false;
-      if(/^\d{1,3}\s+[A-C]$/.test(l)) return false; // "96 B" truncated price
+      if(isAlcampoPrice(l)||ALCAMPO_PACK_RX.test(l)||QTY_ONLY_RX.test(l)) return false;
+      if(/^\d{1,3}\s+[A-C]$/.test(l)) return false; // "96 B"
       if(ALCAMPO_SKIP_RX.test(l)||NOISE_RX.test(l)) return false;
       if(isSkip(l)||SEP_RX.test(l)||BARCODE_RX.test(l)) return false;
       if(/^\d+$/.test(l)||/^[,.]\d+$/.test(l)) return false;
       if(/calle|avda|plaza|s\.a\.|cif\./i.test(l)) return false;
-      if(/^\d{1,2}\/\d{2}\/\d{2}/.test(l)) return false; // fecha
-      if(/\d{4,}/.test(l)&&!/[A-Z]/.test(l)) return false; // código largo
-      return /[A-Za-záéíóúñÁÉÍÓÚÑ]/.test(l); // tiene al menos una letra
+      if(/^\d{1,2}\/\d{2}\/\d{2}/.test(l)) return false;
+      if(store&&l.toLowerCase().includes(store.toLowerCase())) return false;
+      if(/^alcampo\b/i.test(l)) return false; // tienda, siempre filtrar
+      if(/^\d{4,}/.test(l)) return false;
+      return /[A-Za-záéíóúñÁÉÍÓÚÑ]/.test(l);
     }
 
-    // Encontrar inicio (después de FACTURA SIMPLIFICADA o nombre tienda)
-    let start=0;
+    // Encontrar inicio después de FACTURA SIMPLIFICADA
+    // Also capture any "N x" line before the body as orphan qty
+    let start=0, orphanQty=null;
     for(let i=0;i<allLines.length;i++){
-      if(/factura\s+simplificada/i.test(allLines[i])){start=i+1;break;}
-      if(/^alcampo/i.test(allLines[i])&&i>0){start=i+1;}
+      const t=allLines[i].trim();
+      const qm=t.match(/^(\d+)\s*[xX]\s*$/);
+      if(qm&&parseInt(qm[1])>1) orphanQty=parseInt(qm[1]);
+      if(/factura\s+simplificada/i.test(t)){start=i+1;break;}
     }
-    // Encontrar fin (TOT, TARJETA, NUM. TOTAL)
+    // Fin: TOT, TARJETA BANCARIA, NUM. TOTAL, €*
     let end_=allLines.length;
     for(let i=start;i<allLines.length;i++){
       const t=allLines[i].trim();
-      if(/^(tot$|tarjeta\s+bancaria|num\.\s*total|cambio|para\s+el\s+cliente)/i.test(t)){end_=i;break;}
+      if(/^(tarjeta\s+bancaria|num\.\s*total|cambio|para\s+el\s+cliente)/i.test(t)){end_=i;break;}
       if(/^€\*/.test(t)){end_=i;break;}
+      if(/^tot$/i.test(t)){
+        // Include prices that come AFTER TOT before cutting
+        // (iPhone OCR sometimes puts last prices after TOT)
+        end_=i; break;
+      }
     }
+    // Also collect prices after TOT (they belong to last products)
+    const afterTOTprices=[];
+    for(let i=end_;i<Math.min(end_+5,allLines.length);i++){
+      const t=allLines[i].trim();
+      if(isAlcampoPrice(t)){const p=parseAlcampoPrice(t);if(p>0)afterTOTprices.push(p);}
+      else if(/^tot$/i.test(t)) continue;
+      else if(/^(tarjeta|cambio|num\.)/i.test(t)) break;
+    }
+
     const body=allLines.slice(start,end_).map(l=>l.trim()).filter(l=>l);
 
-    // Estrategia: procesar en dos pasadas
-    // Pasada 1: identificar bloques de nombres-seguidos-de-precios
-    // Pasada 2: extraer nombre+precio pares
-
-    // Simplest approach that works: collect all names and all prices separately,
-    // tracking packs. For consecutive name blocks followed by price blocks, pair by index.
-    // For alternating name/price, pair directly.
-
-    const entries=[]; // {name, qty, packUnit}
-    let pendingPack=null; // {qty, unitP}
-    let i=0;
-
-    // Recoger tokens: nombres, precios, packs en orden
+    // Recoger tokens
     const tokens=[];
+    let pendingQty=null; // from "4 x" line
     for(const l of body){
       if(!l||NOISE_RX.test(l)||ALCAMPO_SKIP_RX.test(l)) continue;
+      // "4 x" = qty solo → aplica al SIGUIENTE nombre
+      const qtyOnlyM=l.match(QTY_ONLY_RX);
+      if(qtyOnlyM){pendingQty=parseInt(qtyOnlyM[1]);continue;}
       const packM=l.match(ALCAMPO_PACK_RX);
-      if(packM) tokens.push({type:'pack',qty:parseInt(packM[1]),unitP:parseFloat(packM[2].replace(',','.'))});
-      else if(isAlcampoName(l)) tokens.push({type:'name',val:l});
-      else if(isAlcampoPrice(l)){const p=parseAlcampoPrice(l);if(p>=0) tokens.push({type:'price',val:p});}
+      if(packM){tokens.push({type:'pack',qty:parseInt(packM[1]),unitP:parseFloat(packM[2].replace(',','.'))});continue;}
+      if(isAlcampoName(l)){
+        tokens.push({type:'name',val:l,qty:pendingQty||1});
+        pendingQty=null; continue;
+      }
+      if(isAlcampoPrice(l)){const p=parseAlcampoPrice(l);if(p>=0)tokens.push({type:'price',val:p});continue;}
     }
+    // Add after-TOT prices
+    afterTOTprices.forEach(p=>tokens.push({type:'price',val:p}));
 
-    // Procesar tokens: detectar bloques columna (N names seguidas → N prices seguidas)
-    // vs intercalado (name → price → name → price)
+    // Process tokens into entries
+    const entries=[];
+    let pendingPack=null;
     let j=0;
     while(j<tokens.length){
       const tk=tokens[j];
       if(tk.type==='pack'){pendingPack={qty:tk.qty,unitP:tk.unitP};j++;continue;}
       if(tk.type==='name'){
-        // Contar cuántos nombres consecutivos siguen (sin precios ni packs entre ellos)
+        // Count consecutive names (no prices/packs between them)
         let nameRun=0,k=j;
         while(k<tokens.length&&tokens[k].type==='name'){nameRun++;k++;}
-        // Contar cuántos precios siguen después
+        // Count consecutive prices after the name run
         let priceRun=0,m=k;
         while(m<tokens.length&&tokens[m].type==='price'){priceRun++;m++;}
+
         if(nameRun>1&&priceRun>=nameRun){
-          // Bloque columna: parear names[i] con prices[i] en orden
+          // Column block: pair names[i] with prices[i] in order
           for(let n=0;n<nameRun;n++){
-            const entry={name:tokens[j+n].val,qty:1,unitP:null,price:tokens[k+n].val,raw:tokens[j+n].val};
+            const nt=tokens[j+n];
+            const entry={name:nt.val,qty:nt.qty,unitP:null,price:tokens[k+n].val,raw:nt.val};
+            if(pendingPack&&n===0){entry.qty=pendingPack.qty;entry.unitP=pendingPack.unitP;pendingPack=null;}
+            // Apply preBodyQty: if a product in the block has price divisible by preBodyQty
+
+            entries.push(entry);
+          }
+          // Skip consumed prices
+          j=k+nameRun;
+          // Also skip total-of-line prices (price that equals unit×qty)
+          while(j<tokens.length&&tokens[j].type==='price'){
+            // Check if it's a "line total" price matching any previous entry
+            const p=tokens[j].val;
+            const matchEntry=entries.slice(-nameRun).find(e=>e.qty>1&&e.price&&Math.abs(e.price*e.qty-p)<0.02);
+            if(matchEntry){j++;} else break;
+          }
+        } else if(nameRun>1&&priceRun>0&&priceRun<nameRun){
+          // More names than prices — pair what we have, rest get no price
+          for(let n=0;n<nameRun;n++){
+            const nt=tokens[j+n];
+            const entry={name:nt.val,qty:nt.qty,unitP:null,price:n<priceRun?tokens[k+n].val:null,raw:nt.val};
             if(pendingPack&&n===0){entry.qty=pendingPack.qty;entry.unitP=pendingPack.unitP;pendingPack=null;}
             entries.push(entry);
           }
-          j=k+nameRun; // skip consumed prices
+          j=k+priceRun;
         } else {
-          // Nombre individual
-          const entry={name:tk.val,qty:1,unitP:null,price:null,raw:tk.val};
+          // Single name
+          const entry={name:tk.val,qty:tk.qty,unitP:null,price:null,raw:tk.val};
           if(pendingPack){entry.qty=pendingPack.qty;entry.unitP=pendingPack.unitP;pendingPack=null;}
           entries.push(entry);
           j++;
-          // Buscar precio en siguiente token inmediato (intercalado)
+          // Look for immediate price
           if(j<tokens.length&&tokens[j].type==='price'){
             entry.price=tokens[j].val; j++;
+            // Skip line total if qty>1
+            if(entry.qty>1&&j<tokens.length&&tokens[j].type==='price'){
+              if(Math.abs(tokens[j].val-entry.price*entry.qty)<0.02) j++;
+            }
           }
         }
         continue;
       }
       if(tk.type==='price'){
-        // Precio huérfano — asignar al último entry sin precio
+        // Orphan price — assign to last entry without price
         if(entries.length>0){
           for(let k2=entries.length-1;k2>=Math.max(0,entries.length-4);k2--){
             if(entries[k2].price==null){entries[k2].price=tk.val;break;}
           }
         }
-        j++;
-        continue;
+        j++; continue;
       }
       j++;
     }
 
-    // Build products from entries
+    // Build products
     for(const e of entries){
       if(e.price==null&&e.unitP==null) continue;
       const nm=cleanName(e.name);
       if(nm.length<2) continue;
-      const unitPrice=e.unitP||(e.price||0);
-      out.push(makeProduct(nm,e.raw,unitPrice,e.qty));
+      const unitP=e.unitP||(e.qty>1&&e.price?(e.price/e.qty):e.price)||0;
+      const qty=e.qty||1;
+      out.push(makeProduct(nm,e.raw,unitP,qty));
+    }
+    // Post-process: apply orphanQty to best matching product
+    if(orphanQty&&orphanQty>1){
+      let bestIdx=-1,bestScore=Infinity;
+      for(let k=0;k<out.length;k++){
+        if(out[k].qty!==1) continue;
+        const unitGuess=Math.round(out[k].finalPrice/orphanQty*100)/100;
+        const diff=Math.abs(unitGuess*orphanQty-out[k].finalPrice);
+        if(diff<0.02&&unitGuess>0&&diff<bestScore){bestScore=diff;bestIdx=k;}
+      }
+      if(bestIdx>=0){
+        const p=out[bestIdx];
+        const unitP=Math.round(p.finalPrice/orphanQty*100)/100;
+        p.qty=orphanQty; p.unitPrice=unitP; p.price=unitP;
+      }
     }
   }
+
 
   function parseFroiz(allLines, out){
     const FROIZ_CODE_RX=/^\d{5,}\.?\s*\d*$/;
@@ -1384,6 +1438,8 @@ async function processFile(file){
     try{
       setOCRStatus('Leyendo ticket...');
       ocrText=await googleVisionExtract(b64);
+      // Guardar b64 comprimida para re-lectura con IA visual
+      window._lastTicketB64=b64;
       // Rastrear uso Vision localmente
       if(!DB.visionStats) DB.visionStats={calls:0,firstCall:null};
       DB.visionStats.calls=(DB.visionStats.calls||0)+1;
@@ -1442,6 +1498,7 @@ async function processFile(file){
 
     hideOCRLoading();
     openTicketEditor(result);
+    if(window._lastTicketB64) currentTicket._imageB64=window._lastTicketB64;
 
   }catch(err){
     hideOCRLoading();
@@ -1676,6 +1733,7 @@ function renderTicketEditor(){
     </div>
     <div class="te-footer">
       <button class="btn-secondary" style="flex:1" onclick="closeTicketEditor()">Cancelar</button>
+      ${DB.groqKey&&currentTicket._imageB64?"<button class='btn-secondary' style='flex:1.5;font-size:12px' onclick='leerConIAVisual()'>Leer con IA</button>":""}
       <button class="btn-primary" style="flex:2" onclick="saveTicket()">Guardar</button>
     </div>`;
 }
@@ -1777,6 +1835,50 @@ function removeProduct(i){currentTicket.products.splice(i,1);renderProductsList(
 function addEmptyProduct(){currentTicket.products.push({rawName:'',name:'',price:0,finalPrice:0,qty:1,confidence:1,category:'otro',assignedTo:null,shared:true,pct1:50});renderProductsList();setTimeout(()=>{const l=document.querySelectorAll('.product-row');if(l.length)l[l.length-1].scrollIntoView({behavior:'smooth'});},100);}
 function setTicketPayer(id){currentTicket.payer=id;if(currentTicket.last4)DB.knowledge.cards[currentTicket.last4]=id;renderTicketEditor();}
 function dismissErrors(){currentTicket.errors=[];currentTicket.warnings=[];renderTicketEditor();}
+async function leerConIAVisual(){
+  if(!DB.groqKey||!currentTicket||!currentTicket._imageB64){
+    showToast('Necesitas la Groq Key y haber subido el ticket con la cámara');return;
+  }
+  showToast('Enviando a Groq Vision...',3000);
+  try{
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+DB.groqKey},
+      body:JSON.stringify({
+        model:'meta-llama/llama-4-scout-17b-16e-instruct',
+        max_tokens:1500,
+        messages:[{role:'user',content:[
+          {type:'image_url',image_url:{url:'data:image/jpeg;base64,'+currentTicket._imageB64}},
+          {type:'text',text:'Eres un lector de tickets de supermercado. Extrae los productos con sus cantidades y precios unitarios. Responde SOLO con JSON sin markdown: {"store":"nombre","total":0.00,"products":[{"name":"NOMBRE","qty":1,"unitPrice":0.00}]}'}
+        ]}]
+      })
+    });
+    const d=await res.json();
+    if(!DB.groqStats) DB.groqStats={calls:0,firstCall:null,tokensUsed:0};
+    DB.groqStats.calls=(DB.groqStats.calls||0)+1;
+    DB.groqStats.tokensUsed=(DB.groqStats.tokensUsed||0)+(d.usage?.total_tokens||0);
+    if(!DB.groqStats.firstCall) DB.groqStats.firstCall=new Date().toISOString().slice(0,10);
+    S.set('groqStats',JSON.stringify(DB.groqStats));
+    if(d.error){showToast('Error Groq: '+d.error.message,4000);return;}
+    const text=(d.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(text);
+    if(parsed.products&&parsed.products.length>0){
+      currentTicket.products=parsed.products.map(p=>({
+        name:normalizeProdName(p.name||''),rawName:p.name||'',
+        qty:parseInt(p.qty)||1,unitPrice:parseFloat(p.unitPrice)||0,
+        price:parseFloat(p.unitPrice)||0,
+        finalPrice:parseFloat(((parseFloat(p.unitPrice)||0)*(parseInt(p.qty)||1)).toFixed(2)),
+        confidence:0.95
+      }));
+      if(parsed.store&&!currentTicket.store) currentTicket.store=parsed.store;
+      if(parsed.total&&!currentTicket.total) currentTicket.total=parsed.total;
+      renderTicketEditor();
+      showToast('IA leyó '+parsed.products.length+' productos',3000);
+    } else {
+      showToast('La IA no encontró productos',3000);
+    }
+  }catch(e){showToast('Error: '+e.message,4000);}
+}
 function saveTicket(){
   const t=currentTicket;t.confirmed=true;
   if(!t.total||t.total===0) t.total=(t.products||[]).reduce((s,p)=>s+parseFloat(p.finalPrice||p.price||0),0);
@@ -2306,7 +2408,14 @@ function addCard(idx){const v=document.getElementById('ep-card').value.trim();if
 function removeCard(idx,ci){const c=DB.persons[idx].cards[ci];DB.persons[idx].cards.splice(ci,1);delete DB.knowledge.cards[c];editPerson(idx);}
 function removePerson(idx){if(DB.persons.length<=1){showToast('Debe haber al menos una persona');return;}DB.persons.splice(idx,1);saveDB();closeModal();renderSettings();}
 function savePerson(idx){const n=document.getElementById('ep-name').value.trim();if(n)DB.persons[idx].name=n;saveDB();closeModal();renderSettings();}
-function forgetCard(l4){delete DB.knowledge.cards[l4];saveDB();renderSettings();}
+function forgetCard(l4){
+  delete DB.knowledge.cards[l4];
+  // Also remove from any person's card list
+  DB.persons.forEach(p=>{
+    if(p.cards) p.cards=p.cards.filter(c=>c!==l4);
+  });
+  saveDB();renderSettings();
+}
 let _devTaps=0,_devTimer=null;
 function onLogoTap(){
   _devTaps++;
@@ -2329,13 +2438,27 @@ function editOcrKey(){openModal(`<div class="modal-title">API Key de OCR.space</
 
 function exportData(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='clarito-'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 function resetStatsConfirm(){
-  openModal('<div class="modal-title">Resetear estadísticas</div><p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:16px">Esto eliminará todos los tickets y gastos actuales, como si empezaras un mes nuevo. No afecta a los productos aprendidos ni a la configuración.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="doResetStats()">Resetear</button></div>');
+  window._resetKeepDespensa=true;
+  openModal('<div class="modal-title">Nuevo mes</div>'
+    +'<p style="font-size:14px;color:var(--txt1);line-height:1.5;margin-bottom:12px">Se eliminarán todos los tickets y gastos actuales.</p>'
+    +'<label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:14px;color:var(--txt1)">'
+    +'<input type="checkbox" id="keep-despensa" checked style="width:18px;height:18px"> Mantener datos de despensa estimada</label>'
+    +'<div style="display:flex;gap:10px">'
+    +'<button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn-danger" style="flex:1" onclick="doResetStats()">Empezar mes nuevo</button>'
+    +'</div>');
 }
 function doResetStats(){
+  const keepDespensa=document.getElementById('keep-despensa')?.checked!==false;
   DB.tickets=[];
   DB.expenses=[];
   DB.settlements=[];
-  saveDB();closeModal();showToast('Estadísticas reseteadas');renderPage(currentScreen);
+  if(!keepDespensa&&DB.knowledge){
+    // Clear inventory/despensa data
+    if(DB.knowledge.inventory) DB.knowledge.inventory={};
+    if(DB.knowledge.lastSeen) DB.knowledge.lastSeen={};
+  }
+  saveDB();closeModal();showToast('Mes nuevo iniciado');renderPage(currentScreen);
 }
 function resetAll(){openModal(`<div class="modal-title">¿Borrar todo?</div><p style="font-size:14px;color:var(--txt1);margin-bottom:20px">No se puede deshacer.</p><div style="display:flex;gap:10px"><button class="btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button><button class="btn-danger" style="flex:1" onclick="localStorage.clear();location.reload()">Borrar todo</button></div>`);}
 
