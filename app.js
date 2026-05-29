@@ -674,18 +674,17 @@ function parseTicketText(text){
         end_=i; break;
       }
     }
-    // Collect prices immediately after TOT (last product prices cut off by TOT line)
-    // But stop at first price that looks like the ticket total (>20€ or repeated)
+    // Collect prices immediately after TOT/€* (last product prices cut off by TOT line)
     const afterTOTprices=[];
-    for(let i=end_;i<Math.min(end_+4,allLines.length);i++){
+    for(let i=end_;i<Math.min(end_+6,allLines.length);i++){
       const t=allLines[i].trim();
-      if(/^tot$/i.test(t)) continue;
-      if(/^(tarjeta|cambio|num\.|para\s+el)/i.test(t)) break;
+      if(!t||/^(tot$|€\*|tarjeta|cambio|num\.|para\s+el)/i.test(t)) continue;
+      if(/^(tarjeta bancaria|num\.\s*total)/i.test(t)) break;
       if(isAlcampoPrice(t)){
         const p=parseAlcampoPrice(t);
-        if(p>0&&p<20) afterTOTprices.push(p); // only small prices (products, not totals)
-        else break; // large price = ticket total, stop
-      } else if(t) break; // text line = stop
+        if(p>0&&p<20) afterTOTprices.push(p);
+        else break; // ticket total — stop
+      }
     }
 
     const body=allLines.slice(start,end_).map(l=>l.trim()).filter(l=>l);
@@ -795,6 +794,13 @@ function parseTicketText(text){
     }
 
     // Build products
+    // Pre-build: fill null-priced entries from twins with same name
+    for(let ki=0;ki<entries.length;ki++){
+      if(entries[ki].price==null&&entries[ki].unitP==null){
+        const twin=entries.find((e,ei)=>ei!==ki&&e.name===entries[ki].name&&(e.price!=null||e.unitP!=null));
+        if(twin) entries[ki].price=twin.unitP||twin.price;
+      }
+    }
     for(const e of entries){
       if(e.price==null&&e.unitP==null) continue;
       const nm=cleanName(e.name);
@@ -1803,11 +1809,21 @@ function renderProductRow(prod,i){
   }).join('');
 
   if(_releerMode){
-    return`<div id="releer-card-${i}" data-idx="${i}" data-selected="0"
+    // Same structure as normal product row but tappable + selection state
+    const unitDisplay=unitPrice>0?unitPrice.toFixed(2):'';
+    return`<div class="product-row" id="releer-card-${i}" data-idx="${i}" data-selected="0"
       onclick="toggleReleerCard(${i})"
-      style="margin:6px 16px;padding:12px;border-radius:var(--rad-sm);border:2px solid var(--brd);background:var(--bg2);cursor:pointer;opacity:0.5;transition:all .15s">
-      <div style="font-size:14px;font-weight:500;color:var(--txt0)">${prod.name||'Sin nombre'}</div>
-      <div style="font-size:12px;color:var(--txt2);margin-top:2px">${prod.qty>1?prod.qty+'u · ':''}${prod.unitPrice>0?prod.unitPrice.toFixed(2)+' €/u':''}</div>
+      style="cursor:pointer;opacity:0.45;transition:opacity .15s,border-color .15s;border:2px solid transparent">
+      <div style="flex:1;min-width:0">
+        <input value="${prod.name||''}" readonly style="background:transparent;border:none;font-size:14px;font-weight:500;color:var(--txt0);width:100%;pointer-events:none"/>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+          <span style="font-size:11px;color:var(--txt3)">${prod.qty>1?prod.qty+'×':''}</span>
+          ${prod.category?`<span class="cat-badge" style="pointer-events:none">${prod.category}</span>`:''}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+        <span style="font-size:12px;font-weight:700;color:var(--txt0)">${unitDisplay?unitDisplay+' €':''}</span>
+      </div>
     </div>`;
   }
   return`<div class="product-row" id="prod-${i}">
@@ -1833,9 +1849,11 @@ function renderProductRow(prod,i){
           <button onclick="changeQty(${i},-1)" style="width:22px;height:22px;border-radius:50%;background:var(--bg4);color:var(--txt1);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">−</button>
           <span id="qty-${i}" style="font-size:12px;color:var(--txt2);min-width:20px;text-align:center">${qty}×</span>
           <button onclick="changeQty(${i},1)" style="width:22px;height:22px;border-radius:50%;background:var(--bg4);color:var(--txt1);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
-          ${hasDiscount?`<span style="font-size:10px;color:var(--txt3);text-decoration:line-through">${(unitPrice*qty).toFixed(2)} €</span>`:''}
-          <span id="total-${i}" style="font-size:12px;font-weight:700;color:${hasDiscount?'var(--green)':'var(--txt0)'};min-width:38px;text-align:right">${total>0?total.toFixed(2)+' €':''}</span>
-          ${hasDiscount?`<span style="font-size:10px;color:var(--green);white-space:nowrap">-${prod.discount.toFixed(2)} €</span>`:''}
+          ${hasDiscount
+            ?`<span style="font-size:10px;color:var(--txt3);text-decoration:line-through;text-align:right">${(unitPrice*qty).toFixed(2)} €</span>`
+            :qty>1?`<span style="font-size:10px;color:var(--txt3);text-align:right">${unitPrice.toFixed(2)} €/u</span>`
+            :''}
+          <span id="total-${i}" style="font-size:${(hasDiscount||qty>1)?'15':'12'}px;font-weight:700;color:${hasDiscount?'var(--green)':'var(--txt0)'};min-width:38px;text-align:right">${total>0?total.toFixed(2)+' €':''}</span>
         </div>
       </div>
     </div>
@@ -2351,7 +2369,7 @@ function renderSettings(){
     `:''}
     ${DB.devMode?`<div style="margin:0 16px 16px"><button class="btn-secondary" style="width:100%;color:var(--txt2);font-size:13px" onclick="DB.devMode=false;S.set('devMode',false);saveDB();renderSettings();showToast('Modo desarrollador desactivado')">Ocultar opciones de desarrollador</button></div>`:''}
     ${DB.devMode?`<div class="settings-section">
-      <div class="settings-section-title">Estadísticas 🛠</div>
+      <div class="settings-section-title">Estadísticas</div>
       <div style="background:var(--bg1)">
         <div class="settings-row" onclick="resetStatsConfirm()">
           <div class="settings-icon" style="background:#1a1a2a"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg></div>
@@ -2568,7 +2586,7 @@ function onLogoTap(){
     S.set('devMode',DB.devMode);
     saveDB();
     renderSettings();
-    showToast(DB.devMode?'Modo desarrollador activado 🛠':'Modo desarrollador desactivado',2000);
+    showToast(DB.devMode?'Modo desarrollador activado':'Modo desarrollador desactivado',2000);
   } else {
     _devTimer=setTimeout(()=>{_devTaps=0;},1200);
   }
