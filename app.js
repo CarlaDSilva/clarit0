@@ -25,7 +25,7 @@ const _pid=()=>(crypto.randomUUID?crypto.randomUUID():'p_'+Date.now().toString(3
 // Asigna un pid estable a cada producto aprendido que no lo tenga.
 // Las claves que comparten alias son el mismo producto → comparten pid.
 function migratePids(){
-  const prods=DB.knowledge&&DB.knowledge.products;if(!prods)return;
+  const prods=DB.knowledge&&DB.knowledge.products;if(!prods)return false;
   const groups={};
   for(const [key,v] of Object.entries(prods)){
     if(!v)continue;
@@ -38,6 +38,7 @@ function migratePids(){
     for(const [,v] of list){if(v.pid!==pid){v.pid=pid;changed=true;}}
   }
   if(changed)saveDB();
+  return changed;
 }
 function showToast(msg,dur=2500){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
 function openModal(html){document.getElementById('modal-content').innerHTML=html;document.getElementById('modal-overlay').style.display='flex';}
@@ -128,6 +129,7 @@ async function setupGistRestore(){
     DB.devMode=false;
     DB.aiConvMessages=[];
     if(!DB.knowledge) DB.knowledge={products:{},cards:{}};
+    migratePids();
     saveDB();
     document.getElementById('setup-screen').style.display='none';
     document.getElementById('app').style.display='flex';
@@ -1912,7 +1914,9 @@ const GistSync = {
     if(!DB.knowledge) DB.knowledge={products:{},cards:{}};
     if(!DB.aiQuestions) DB.aiQuestions=[];
     DB.persons.forEach(p=>{if(!p.cards)p.cards=[];});
+    const _pidChanged=migratePids();
     saveDB();
+    if(_pidChanged) GistSync.push();
     showScreen(currentScreen);
     updateAIBadge();
   }
