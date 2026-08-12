@@ -685,8 +685,10 @@ async function groqFetchFallback(key,models,buildBody){
     let res;
     try{res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(buildBody(model))});}
     catch(e){lastErr=new Error('Red bloqueada: '+e.message);continue;}
-    if(res.ok)return await res.json();
-    const e=await res.json().catch(()=>({}));const msg=e.error?.message||'Groq HTTP '+res.status;
+    const raw=await res.text().catch(()=>'');
+    let json=null;try{json=JSON.parse(raw);}catch(_){}
+    if(res.ok){if(json)return json;lastErr=new Error('Respuesta no-JSON (HTTP '+res.status+') de '+model+': '+raw.slice(0,80));continue;}
+    const msg=json?.error?.message||('Groq HTTP '+res.status+': '+raw.slice(0,80));
     if(res.status===404||res.status===400||/decommission|deprecat|not found|does not exist|no longer|unavailable/i.test(msg)){lastErr=new Error(msg);continue;}
     throw new Error(msg);
   }
