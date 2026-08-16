@@ -51,7 +51,7 @@ function hideSplash(){const s=document.getElementById('splash');s.classList.add(
 let currentScreen='home';
 function showScreen(name){currentScreen=name;document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('nav-'+name)?.classList.add('active');document.getElementById('view').scrollTop=0;if(name==='stats')_statsMonthOffset=0;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();updateAIBadge();}
 
-let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0;
+let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.0.0 · Lavanda';
 // setupStep: -1=bienvenida, 0=API keys, 1=personas, 2=nombres/colores, 3=listo
 function startSetup(){document.getElementById('setup-screen').style.display='flex';setupStep=-1;renderSetupStep();}
 function renderSetupStep(){
@@ -75,7 +75,8 @@ function renderSetupStep(){
       <p class="setup-link-hint"><a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="link-accent" onclick="window.open(this.href,'_blank');return false">console.cloud.google.com</a> → APIs → Credenciales</p>
       <div class="field-row"><label class="field-label">Groq Key <span class="label-hint">(asistente IA)</span></label><input type="password" id="s-groqkey" placeholder="gsk_..." value="${DB.groqKey||''}"/></div>
       <p class="setup-link-hint"><a href="https://console.groq.com/keys" target="_blank" class="link-accent" onclick="window.open(this.href,'_blank');return false">console.groq.com</a> → API Keys (gratis)</p>
-      <button class="btn-primary" onclick="setupNext0()">Continuar →</button>${backBtn}`;
+      <button class="btn-primary" onclick="setupNext0()">Continuar →</button>${backBtn}
+      <p class="setup-version">${APP_VERSION}</p>`;
   } else if(setupStep===1){
     html+=`<h2>¿Cuántas personas?</h2><p>¿Cuántas personas comparten gastos en este hogar?</p>
       <div class="person-count-row">${[2,3,4,5].map(n=>`<button onclick="setupPersonCount=${n};document.querySelectorAll('.pc-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')" class="btn-secondary pc-btn ${setupPersonCount===n?'active':''}">${n} personas</button>`).join('')}</div>
@@ -695,7 +696,12 @@ async function groqFetchFallback(key,models,buildBody){
   throw lastErr||new Error('Groq: ningún modelo disponible');
 }
 async function callGroq(prompt){const key=DB.groqKey;if(!key)throw new Error('No hay API key de Groq. Ve a Configuración.');const data=await groqFetchFallback(key,GROQ_TEXT_MODELS,model=>({model,messages:[{role:'user',content:prompt}],temperature:0.2,max_tokens:1024}));if(!DB.groqStats)DB.groqStats={calls:0,firstCall:null,tokensUsed:0};DB.groqStats.calls=(DB.groqStats.calls||0)+1;DB.groqStats.tokensUsed=(DB.groqStats.tokensUsed||0)+(data.usage?.total_tokens||0);if(!DB.groqStats.firstCall)DB.groqStats.firstCall=new Date().toISOString().slice(0,10);S.set('groqStats',JSON.stringify(DB.groqStats));return data.choices?.[0]?.message?.content||'';}
-async function groqParseText(ocrText){const key=DB.groqKey;if(!key)throw new Error('Sin API key Groq');const knownProds=Object.entries(DB.knowledge.products).slice(0,8).map(([k,v])=>`${k}→${v.shared?'común':personName(v.person)}`).join(', ');const prompt=`Analiza este texto de un ticket de supermercado español. Devuelve SOLO JSON sin markdown ni texto extra:\n{"store":"","date":"YYYY-MM-DD o null","time":"HH:MM o null","total":0,"last4":"4 dígitos o null","products":[{"rawName":"texto literal","name":"nombre legible","price":0,"unitPrice":0,"qty":1,"confidence":0.9,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|congelados|otro"}],"errors":[],"warnings":[]}\nIgnora líneas de IVA, entrega efectivo, devolución, descuentos con %, total, subtotal.\nTexto:\n${ocrText}\n${knownProds?' Conocidos: '+knownProds:''}`;const data=await groqFetchFallback(key,GROQ_TEXT_MODELS,model=>({model,messages:[{role:'user',content:prompt}],temperature:0.1,max_tokens:2048}));const text=data.choices?.[0]?.message?.content||'';const clean=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();try{return JSON.parse(clean);}catch{const m=clean.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('JSON inválido de Groq');}}
+function parseGroqJSON(data){
+  const text=(data?.choices?.[0]?.message?.content||'').replace(/```json/gi,'').replace(/```/g,'').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+  try{return JSON.parse(text);}catch(_){const m=text.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('Groq no devolvió JSON legible');}
+}
+
+async function groqParseText(ocrText){const key=DB.groqKey;if(!key)throw new Error('Sin API key Groq');const knownProds=Object.entries(DB.knowledge.products).slice(0,8).map(([k,v])=>`${k}→${v.shared?'común':personName(v.person)}`).join(', ');const prompt=`Analiza este texto de un ticket de supermercado español. Devuelve SOLO JSON sin markdown ni texto extra:\n{"store":"","date":"YYYY-MM-DD o null","time":"HH:MM o null","total":0,"last4":"4 dígitos o null","products":[{"rawName":"texto literal","name":"nombre legible","price":0,"unitPrice":0,"qty":1,"confidence":0.9,"category":"alimentación|higiene|limpieza|bebidas|lácteos|fruta|carne|pescado|congelados|otro"}],"errors":[],"warnings":[]}\nIgnora líneas de IVA, entrega efectivo, devolución, descuentos con %, total, subtotal.\nTexto:\n${ocrText}\n${knownProds?' Conocidos: '+knownProds:''}`;const data=await groqFetchFallback(key,GROQ_TEXT_MODELS,model=>({model,messages:[{role:'user',content:prompt}],temperature:0.1,max_tokens:2048}));return parseGroqJSON(data);}
 
 // ── PROCESS FILE ──────────────────────────────────────────────
 async function processFile(file){
@@ -932,8 +938,8 @@ async function enviarReleer(){
     const d=await groqFetchFallback(DB.groqKey,GROQ_VISION_MODELS,model=>({model,max_tokens:1500,messages:[{role:'user',content:[{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+window._lastTicketB64}},{type:'text',text:'Eres un lector de tickets de supermercado. Extrae TODOS los productos con sus cantidades y precios unitarios.'+cL+'\n\nResponde SOLO con JSON sin markdown: {"store":"nombre","total":0.00,"products":[{"name":"NOMBRE","qty":1,"unitPrice":0.00}]}'}]}]}));
     if(!DB.groqStats)DB.groqStats={calls:0,firstCall:null,tokensUsed:0};DB.groqStats.calls=(DB.groqStats.calls||0)+1;DB.groqStats.tokensUsed=(DB.groqStats.tokensUsed||0)+(d.usage?.total_tokens||0);if(!DB.groqStats.firstCall)DB.groqStats.firstCall=new Date().toISOString().slice(0,10);S.set('groqStats',JSON.stringify(DB.groqStats));
     if(d.error){showToast('Error Groq: '+d.error.message,4000);return;}
-    let text=(d.choices?.[0]?.message?.content||'').replace(/\`\`\`json|\`\`\`/g,'').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();let parsed;try{parsed=JSON.parse(text);}catch(_){const m=text.match(/\{[\s\S]*\}/);if(!m)throw new Error('Groq no devolvió JSON legible');parsed=JSON.parse(m[0]);}
-    if(parsed.products&&parsed.products.length>0){const cN=new Set(confirmed.map(p=>p.name.toLowerCase()));const gP=parsed.products.filter(p=>!cN.has((p.name||'').toLowerCase())).map(p=>({name:normalizeProdName(p.name||''),rawName:p.name||'',qty:parseInt(p.qty)||1,unitPrice:parseFloat(p.unitPrice)||0,price:parseFloat(p.unitPrice)||0,finalPrice:parseFloat(((parseFloat(p.unitPrice)||0)*(parseInt(p.qty)||1)).toFixed(2)),confidence:0.9}));currentTicket.products=[...confirmed,...gP];if(parsed.store&&!currentTicket.store)currentTicket.store=parsed.store;if(parsed.total&&!currentTicket.total)currentTicket.total=parsed.total;renderTicketEditor();showToast('Groq añadió '+gP.length+' productos · '+confirmed.length+' confirmados',3500);}
+    let parsed=parseGroqJSON(d);
+    if(parsed.products&&parsed.products.length>0){const cN=new Set(confirmed.map(p=>p.name.toLowerCase()));const gP=parsed.products.filter(p=>!cN.has((p.name||'').toLowerCase())).map(p=>applyKnowledgeToProduct({name:normalizeProdName(p.name||''),rawName:p.name||'',qty:parseInt(p.qty)||1,unitPrice:parseFloat(p.unitPrice)||0,price:parseFloat(p.unitPrice)||0,finalPrice:parseFloat(((parseFloat(p.unitPrice)||0)*(parseInt(p.qty)||1)).toFixed(2)),confidence:0.9}));currentTicket.products=[...confirmed,...gP];if(parsed.store&&!currentTicket.store)currentTicket.store=parsed.store;if(parsed.total&&!currentTicket.total)currentTicket.total=parsed.total;renderTicketEditor();showToast('Groq añadió '+gP.length+' productos · '+confirmed.length+' confirmados',3500);}
     else showToast('Groq no encontró productos adicionales',3000);
   }catch(e){showToast('Error: '+e.message,4000);}
 }
@@ -1070,61 +1076,73 @@ function statsMonthNav(dir){
   renderStats();
 }
 
+function statsMonthTickets(offset){
+  const now=new Date();const target=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  const yr=target.getFullYear(),mo=target.getMonth();
+  return DB.tickets.filter(t=>{if(!t.confirmed||!t.date)return false;const d=new Date(t.date);return !isNaN(d)&&d.getFullYear()===yr&&d.getMonth()===mo;});
+}
+function statsBreakdown(tickets){
+  const cross={},belongs={};DB.persons.forEach(p=>{cross[p.id]=[];belongs[p.id]=[];});
+  tickets.forEach(t=>{const payer=t.payer;(t.products||[]).forEach(prod=>{
+    const price=parseFloat(prod.finalPrice||prod.price||0);if(isNaN(price)||price<=0)return;
+    const owner=prod.assignedTo;if(!owner)return;
+    (belongs[owner]=belongs[owner]||[]).push({name:prod.name||prod.rawName||'—',price});
+    if(payer&&payer!==owner)(cross[payer]=cross[payer]||[]).push({name:prod.name||prod.rawName||'—',price});
+  });});
+  return {cross,belongs};
+}
+function statsList(items){
+  if(!items||!items.length)return '<div class="stats-empty">Nada en este periodo</div>';
+  const total=items.reduce((s,x)=>s+x.price,0);
+  return '<div class="stats-breakdown">'+items.map(x=>`<div class="stats-brk-row"><span class="stats-brk-name">${x.name}</span><span class="stats-brk-amt">${fmt(x.price)}</span></div>`).join('')+`<div class="stats-brk-row stats-brk-total"><span class="stats-brk-name">Total</span><span class="stats-brk-amt">${fmt(total)}</span></div>`+'</div>';
+}
+function statsCollapsibles(tickets){
+  const bd=statsBreakdown(tickets);const persons=DB.persons;let html='';
+  persons.forEach(p=>{
+    const others=persons.filter(o=>o.id!==p.id);const items=bd.cross[p.id]||[];const subtotal=items.reduce((s,x)=>s+x.price,0);
+    html+=`<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl">${p.name} pagó cosas de ${others.map(o=>o.name).join(', ')}</span><span class="stats-collapse-amt">${fmt(subtotal)}</span></summary>${statsList(items)}</details>`;
+  });
+  let totalHtml='';
+  persons.forEach(p=>{const items=bd.belongs[p.id]||[];const subtotal=items.reduce((s,x)=>s+x.price,0);
+    totalHtml+=`<div class="stats-person-block"><div class="stats-person-head" style="--person-color:${p.color}"><span>${p.name}</span><span class="stats-collapse-amt">${fmt(subtotal)}</span></div>${statsList(items)}</div>`;
+  });
+  html+=`<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl">Total de productos por persona</span></summary>${totalHtml}</details>`;
+  return html;
+}
+function statsSetMode(m){_statsMode=m;renderStats();}
 function renderStats(){
-  const now=new Date();
-  const thisYear=now.getFullYear(), thisMon=now.getMonth();
   const allT=DB.tickets.filter(t=>t.confirmed);
   const ms=computeMonthStats(_statsMonthOffset);
-  const monthTotal=ms.total;
-  const monthByPerson=ms.byPerson;
-  const monthPaidOut=ms.paidOut;
-  const canGoBack=_statsMonthOffset>-11;
-  const canGoForward=_statsMonthOffset<0;
+  const monthTotal=ms.total,monthByPerson=ms.byPerson,monthPaidOut=ms.paidOut;
+  const canGoBack=_statsMonthOffset>-11,canGoForward=_statsMonthOffset<0;
   const storeMap={};allT.forEach(t=>{if(t.store)storeMap[t.store]=(storeMap[t.store]||0)+(parseFloat(t.total)||0);});
   const storeSorted=Object.entries(storeMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const prodCount={};allT.forEach(t=>(t.products||[]).forEach(p=>{const k=p.name||p.rawName||'';if(!k)return;prodCount[k]=(prodCount[k]||0)+(p.qty||1);}));
-  const topProds=Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const anomalies=detectAnomalies();
+  let collapseBlock='';
+  if(_statsMode==='month'){
+    collapseBlock=statsCollapsibles(statsMonthTickets(_statsMonthOffset));
+  }else{
+    const {owes,amount}=calcBalance();
+    const creditor=owes?DB.persons.find(p=>p.id!==owes):null;
+    const debtLine=(!owes||amount<0.01)?'<div class="stats-debt-ok">Todo está Clarito</div>':`<div class="stats-debt"><span>${personName(owes)} debe a ${creditor?creditor.name:''}</span><span class="stats-debt-amt">${fmt(amount)}</span></div>`;
+    const unsettled=DB.tickets.filter(t=>t.confirmed&&!t.settled);
+    const settles=DB.settlements.slice().reverse();
+    const settleHtml=settles.length?('<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl">Deudas ya saldadas</span></summary><div class="stats-breakdown">'+settles.map(s=>`<div class="stats-brk-row"><span class="stats-brk-name">${fmtDate(s.date)} · ${s.msg}</span></div>`).join('')+'</div></details>'):'';
+    collapseBlock=debtLine+statsCollapsibles(unsettled)+settleHtml;
+  }
+  const monthNav=_statsMode==='month'?`<div class="month-nav-row" id="stats-month-nav"><button class="month-nav-btn" onclick="statsMonthNav(-1)" ${canGoBack?'':'disabled'}>&#8249;</button><span class="month-nav-label">${ms.label}</span><button class="month-nav-btn" onclick="statsMonthNav(1)" ${canGoForward?'':'disabled'}>&#8250;</button></div>`:'';
   document.getElementById('view').innerHTML=`
     <div class="screen-header"><h1>Estadísticas</h1><p>Análisis del hogar</p></div>
-    <div class="month-nav-row" id="stats-month-nav">
-      <button class="month-nav-btn" onclick="statsMonthNav(-1)" ${canGoBack?'':'disabled'}>&#8249;</button>
-      <span class="month-nav-label">${ms.label}</span>
-      <button class="month-nav-btn" onclick="statsMonthNav(1)" ${canGoForward?'':'disabled'}>&#8250;</button>
-    </div>
+    ${monthNav}
     <div class="stats-grid"><div class="stat-card"><div class="stat-label">Gastado</div><div class="stat-value">${fmt(monthTotal)}</div></div><div class="stat-card"><div class="stat-label">Tickets del mes</div><div class="stat-value">${ms.ticketCount}</div></div></div>
     <div class="recent-label">Gasto por persona</div>
     <div class="persons-stats-grid">${DB.persons.map(p=>`<div class="stat-card stat-card-person" style="--person-color:${p.color}"><div class="stat-label">${p.name}</div><div class="stat-value stat-value-person">${fmt(monthByPerson[p.id]||0)}</div><div class="stat-paid-out">Pagó en caja: ${fmt(monthPaidOut[p.id]||0)}</div></div>`).join('')}</div>
     ${anomalies.length?`<div class="anomalies-list">${anomalies.map(a=>`<div class="anomaly-chip">${a}</div>`).join('')}</div>`:''}
-    <div class="inv-section-header">
-      <span class="recent-label" style="padding:0">Despensa estimada</span>
-      <div style="display:flex;gap:8px">
-        <button class="inv-add-btn" onclick="openAddDespensa()" title="Añadir producto">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-        <button class="inv-reminders-btn" onclick="sendDespensaToReminders()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          Recordatorios
-        </button>
-      </div>
-    </div>
-    ${renderInventorySection()}
-    ${storeSorted.length?`<div class="recent-label">Por supermercado</div><div class="bar-chart">${storeSorted.map(([s,a],i)=>{const cols=['var(--accent)','var(--green)','var(--blue)','var(--amber)','var(--red)'];return`<div class="bar-row"><div class="bar-name">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(a/storeSorted[0][1]*100)}%;background:${cols[i]}"></div></div><div class="bar-amt">${fmt(a)}</div></div>`;}).join('')}</div>`:''}
-    ${topProds.length?`<details class="stats-details"><summary class="stats-details-summary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>Más estadísticas</summary>${topProds.length?`<div class="recent-label">Productos más comprados</div><div class="bar-chart">${topProds.map(([name,qty])=>`<div class="bar-row"><div class="bar-name">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(qty/topProds[0][1]*100)}%;background:var(--accent)"></div></div><div class="bar-amt">${qty}x</div></div>`).join('')}</div>`:''}</details>`:''}`;
-  setTimeout(()=>{document.querySelectorAll('.inv-archive-btn').forEach(btn=>{btn.onclick=()=>archiveDespensa(btn.dataset.key);});},0);
-  // Swipe en la zona de navegación de meses
+    <div class="stats-mode-toggle"><button class="stats-seg ${_statsMode==='month'?'active':''}" onclick="statsSetMode('month')">Por mes</button><button class="stats-seg ${_statsMode==='balance'?'active':''}" onclick="statsSetMode('balance')">Por balance</button></div>
+    ${collapseBlock}
+    ${storeSorted.length?`<div class="recent-label">Por supermercado</div><div class="bar-chart">${storeSorted.map(([s,a],i)=>{const cols=['var(--accent)','var(--green)','var(--blue)','var(--amber)','var(--red)'];return`<div class="bar-row"><div class="bar-name">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(a/storeSorted[0][1]*100)}%;background:${cols[i]}"></div></div><div class="bar-amt">${fmt(a)}</div></div>`;}).join('')}</div>`:''}`;
   const nav=document.getElementById('stats-month-nav');
-  if(nav){
-    let sx=0;
-    nav.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});
-    nav.addEventListener('touchend',e=>{
-      const dx=e.changedTouches[0].clientX-sx;
-      if(Math.abs(dx)>40){
-        if(dx<0&&_statsMonthOffset>-11) statsMonthNav(-1);
-        else if(dx>0&&_statsMonthOffset<0) statsMonthNav(1);
-      }
-    },{passive:true});
-  }
+  if(nav){let sx=0;nav.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});nav.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>40){if(dx<0&&_statsMonthOffset>-11)statsMonthNav(-1);else if(dx>0&&_statsMonthOffset<0)statsMonthNav(1);}},{passive:true});}
   applyReadOnlyUI();
 }
 function detectAnomalies(){const now=new Date(),msgs=[];const thisT=DB.tickets.filter(t=>t.confirmed&&t.date&&new Date(t.date).getMonth()===now.getMonth());const lastT=DB.tickets.filter(t=>t.confirmed&&t.date&&new Date(t.date).getMonth()===(now.getMonth()-1+12)%12);const tT=thisT.reduce((s,t)=>s+parseFloat(t.total||0),0);const lT=lastT.reduce((s,t)=>s+parseFloat(t.total||0),0);if(lT>0&&tT>lT*1.3)msgs.push('Este mes gastáis un '+Math.round((tT/lT-1)*100)+'% más que el mes pasado.');return msgs;}
@@ -1495,7 +1513,7 @@ function renderSettings(){
       </div>
     </div>
     ${DB.devMode?renderDevSettings():''}
-    <p class="settings-footer">Clarito · Datos guardados localmente</p>`;
+    <p class="settings-footer">Clarito ${APP_VERSION} · Datos guardados localmente</p>`;
   applyReadOnlyUI();
 }
 function renderDevSettings(){return`

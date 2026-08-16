@@ -508,3 +508,29 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent)}
 .ac-item:last-child{border-bottom:none}
 .ac-item:active{background:var(--bg4)}
 .ac-store{font-size:11px;color:var(--txt3)}
+
+/* ── Stats v4: toggle mes/balance + colapsables ── */
+.stats-mode-toggle{display:flex;gap:6px;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:4px;margin:18px 0 12px}
+.stats-seg{flex:1;padding:10px;border-radius:calc(var(--rad-sm) - 2px);background:transparent;color:var(--txt1);font-size:15px;font-weight:600;text-align:center}
+.stats-seg.active{background:var(--accent);color:#fff}
+.stats-collapse{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);margin:0 0 10px;overflow:hidden}
+.stats-collapse-sum{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;list-style:none;font-size:16px;color:var(--txt0)}
+.stats-collapse-sum::-webkit-details-marker{display:none}
+.stats-collapse-sum svg{flex:0 0 auto;transition:transform .2s;color:var(--txt1)}
+.stats-collapse[open] .stats-collapse-sum svg{transform:rotate(180deg)}
+.stats-collapse-ttl{flex:1;font-weight:600}
+.stats-collapse-amt{font-weight:700;color:var(--accent);font-size:16px}
+.stats-breakdown{padding:4px 16px 14px}
+.stats-brk-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--brd);font-size:15px;color:var(--txt0)}
+.stats-brk-name{flex:1;word-break:break-word}
+.stats-brk-amt{flex:0 0 auto;color:var(--txt1);font-variant-numeric:tabular-nums}
+.stats-brk-total{font-weight:700}
+.stats-brk-total .stats-brk-amt{color:var(--txt0)}
+.stats-empty{padding:14px 16px;color:var(--txt1);font-size:15px}
+.stats-person-block{padding:0 16px 6px}
+.stats-person-head{display:flex;justify-content:space-between;align-items:center;padding:12px 0 4px;font-size:16px;font-weight:700;color:var(--person-color,var(--txt0));border-top:1px solid var(--brd)}
+.stats-person-block .stats-breakdown{padding:0}
+.stats-debt{display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);padding:16px;margin:0 0 12px;font-size:17px;font-weight:600;color:var(--txt0)}
+.stats-debt-amt{font-weight:800;color:var(--accent)}
+.stats-debt-ok{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);padding:18px;margin:0 0 12px;text-align:center;font-size:17px;font-weight:700;color:var(--green)}
+.setup-version{text-align:center;color:var(--txt1);font-size:14px;margin-top:18px;letter-spacing:.3px}
