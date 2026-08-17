@@ -8,7 +8,7 @@ const PRESET_COLORS=['#ea580c','#c2410c','#a855f7','#ec4899','#f9a8d4','#38bdf8'
 let DB={apiKey:'',ocrKey:'helloworld',visionKey:'',groqKey:'',gistToken:'',gistId:'',cloudinaryCloud:'',cloudinaryPreset:'',cloudinaryApiKey:'',cloudinarySecret:'',groqStats:{calls:0,firstCall:null,tokensUsed:0},devMode:false,visionStats:{calls:0,firstCall:null},persons:[{id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},{id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}],tickets:[],expenses:[],settlements:[],knowledge:{products:{},cards:{}},aiQuestions:[],aiConvMessages:[]};
 
 function loadDB(){const saved=S.get('db');if(saved)DB=Object.assign({},DB,saved);DB.ocrKey=S.get('ocrKey')||DB.ocrKey||'helloworld';DB.visionKey=S.get('visionKey')||DB.visionKey||'';DB.groqKey=S.get('groqKey')||DB.groqKey||'';try{const gs=S.get('groqStats');if(gs)DB.groqStats=JSON.parse(gs);}catch{}try{const vs=S.get('visionStats');if(vs)DB.visionStats=JSON.parse(vs);}catch{}DB.devMode=S.get('devMode')||false;if(!DB.knowledge)DB.knowledge={products:{},cards:{}};if(!DB.aiQuestions)DB.aiQuestions=[];if(!DB.aiConvMessages)DB.aiConvMessages=[];DB.persons.forEach(p=>{if(!p.cards)p.cards=[];});migratePids();try{const settledIds=S.get('settledTicketIds')||[];if(settledIds.length>0){const idSet=new Set(settledIds);DB.tickets.forEach(t=>{if(idSet.has(t.id))t.settled=true;});}}catch(e){}}
-function expireOldTickets(){const now=new Date();const cutoff=new Date(now.getTime()-60*24*60*60*1000).toISOString().slice(0,10);const before=DB.tickets.length;const expired=DB.tickets.filter(t=>{const d=t.createdAt||t.date;return d&&d<cutoff;});expired.forEach(t=>{ImgDB.delete(t.id);CloudImg.delete(t.id);});DB.tickets=DB.tickets.filter(t=>{const d=t.createdAt||t.date;return !d||d>=cutoff;});if(DB.tickets.length<before)saveDB();}
+function expireOldTickets(){/* Retención infinita: los datos de tickets NUNCA se borran automáticamente. La gestión por capacidad (borrar solo imágenes al 90%) se hará aparte. */}
 function saveDB(){try{S.set('db',JSON.parse(JSON.stringify(DB)));}catch(e){console.error('saveDB error:',e);}}
 
 const fmt=n=>isNaN(n)||n==null?'0,00 €':Number(n).toFixed(2).replace('.',',')+' €';
@@ -771,7 +771,7 @@ function renderHome(){
     </div>
     <div class="recent-label">Últimas actividades</div>
     ${recent.length===0?`<div class="empty-state"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="2"/></svg><h3>Sin actividad todavía</h3><p>Sube tu primer ticket o añade un gasto manual</p></div>`:recent.map(renderTicketListItem).join('')}
-    ${renderPredictionsWidget()}`;
+    `;
   applyReadOnlyUI();
 }
 
@@ -1076,25 +1076,38 @@ function statsMonthNav(dir){
   renderStats();
 }
 
+let _statsInclCommon=false;
+function statsSetMode(m){_statsMode=m;renderStats();}
+function statsToggleCommon(){_statsInclCommon=!_statsInclCommon;renderStats();}
 function statsMonthTickets(offset){
   const now=new Date();const target=new Date(now.getFullYear(),now.getMonth()+offset,1);
   const yr=target.getFullYear(),mo=target.getMonth();
   return DB.tickets.filter(t=>{if(!t.confirmed||!t.date)return false;const d=new Date(t.date);return !isNaN(d)&&d.getFullYear()===yr&&d.getMonth()===mo;});
 }
 function statsBreakdown(tickets){
-  const cross={},belongs={};DB.persons.forEach(p=>{cross[p.id]=[];belongs[p.id]=[];});
+  const cross={},belongs={},common=[];const persons=DB.persons;const p0=persons[0]?persons[0].id:null;
+  persons.forEach(p=>{cross[p.id]=[];belongs[p.id]=[];});
   tickets.forEach(t=>{const payer=t.payer;(t.products||[]).forEach(prod=>{
     const price=parseFloat(prod.finalPrice||prod.price||0);if(isNaN(price)||price<=0)return;
-    const owner=prod.assignedTo;if(!owner)return;
-    (belongs[owner]=belongs[owner]||[]).push({name:prod.name||prod.rawName||'—',price});
-    if(payer&&payer!==owner)(cross[payer]=cross[payer]||[]).push({name:prod.name||prod.rawName||'—',price});
+    const name=prod.name||prod.rawName||'—';const owner=prod.assignedTo;
+    if(owner){
+      (belongs[owner]=belongs[owner]||[]).push({name,price});
+      if(payer&&payer!==owner)(cross[payer]=cross[payer]||[]).push({name,price});
+    }else{
+      common.push({name,price});
+      if(_statsInclCommon){
+        const pct1=(prod.pct1==null?50:prod.pct1);
+        persons.forEach(q=>{const pct=(q.id===p0)?pct1:100-pct1;const share=price*pct/100;if(share<=0)return;(belongs[q.id]=belongs[q.id]||[]).push({name,price:share});if(payer&&payer!==q.id)(cross[payer]=cross[payer]||[]).push({name,price:share});});
+      }
+    }
   });});
-  return {cross,belongs};
+  return {cross,belongs,common};
 }
 function statsList(items){
   if(!items||!items.length)return '<div class="stats-empty">Nada en este periodo</div>';
-  const total=items.reduce((s,x)=>s+x.price,0);
-  return '<div class="stats-breakdown">'+items.map(x=>`<div class="stats-brk-row"><span class="stats-brk-name">${x.name}</span><span class="stats-brk-amt">${fmt(x.price)}</span></div>`).join('')+`<div class="stats-brk-row stats-brk-total"><span class="stats-brk-name">Total</span><span class="stats-brk-amt">${fmt(total)}</span></div>`+'</div>';
+  const sorted=items.slice().sort((a,b)=>b.price-a.price);
+  const total=sorted.reduce((s,x)=>s+x.price,0);
+  return '<div class="stats-breakdown">'+sorted.map(x=>`<div class="stats-brk-row"><span class="stats-brk-name">${x.name}</span><span class="stats-brk-amt">${fmt(x.price)}</span></div>`).join('')+`<div class="stats-brk-row stats-brk-total"><span class="stats-brk-name">Total</span><span class="stats-brk-amt">${fmt(total)}</span></div>`+'</div>';
 }
 function statsCollapsibles(tickets){
   const bd=statsBreakdown(tickets);const persons=DB.persons;let html='';
@@ -1107,16 +1120,14 @@ function statsCollapsibles(tickets){
     totalHtml+=`<div class="stats-person-block"><div class="stats-person-head" style="--person-color:${p.color}"><span>${p.name}</span><span class="stats-collapse-amt">${fmt(subtotal)}</span></div>${statsList(items)}</div>`;
   });
   html+=`<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl">Total de productos por persona</span></summary>${totalHtml}</details>`;
+  const cTotal=bd.common.reduce((s,x)=>s+x.price,0);
+  html+=`<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl">Comunes</span><span class="stats-collapse-amt">${fmt(cTotal)}</span></summary><label class="stats-common-toggle"><input type="checkbox" ${_statsInclCommon?'checked':''} onchange="statsToggleCommon()"><span>Incluir comunes en los cálculos por persona</span></label>${statsList(bd.common)}</details>`;
   return html;
 }
-function statsSetMode(m){_statsMode=m;renderStats();}
 function renderStats(){
-  const allT=DB.tickets.filter(t=>t.confirmed);
   const ms=computeMonthStats(_statsMonthOffset);
   const monthTotal=ms.total,monthByPerson=ms.byPerson,monthPaidOut=ms.paidOut;
   const canGoBack=_statsMonthOffset>-11,canGoForward=_statsMonthOffset<0;
-  const storeMap={};allT.forEach(t=>{if(t.store)storeMap[t.store]=(storeMap[t.store]||0)+(parseFloat(t.total)||0);});
-  const storeSorted=Object.entries(storeMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const anomalies=detectAnomalies();
   let collapseBlock='';
   if(_statsMode==='month'){
@@ -1139,8 +1150,7 @@ function renderStats(){
     <div class="persons-stats-grid">${DB.persons.map(p=>`<div class="stat-card stat-card-person" style="--person-color:${p.color}"><div class="stat-label">${p.name}</div><div class="stat-value stat-value-person">${fmt(monthByPerson[p.id]||0)}</div><div class="stat-paid-out">Pagó en caja: ${fmt(monthPaidOut[p.id]||0)}</div></div>`).join('')}</div>
     ${anomalies.length?`<div class="anomalies-list">${anomalies.map(a=>`<div class="anomaly-chip">${a}</div>`).join('')}</div>`:''}
     <div class="stats-mode-toggle"><button class="stats-seg ${_statsMode==='month'?'active':''}" onclick="statsSetMode('month')">Por mes</button><button class="stats-seg ${_statsMode==='balance'?'active':''}" onclick="statsSetMode('balance')">Por balance</button></div>
-    ${collapseBlock}
-    ${storeSorted.length?`<div class="recent-label">Por supermercado</div><div class="bar-chart">${storeSorted.map(([s,a],i)=>{const cols=['var(--accent)','var(--green)','var(--blue)','var(--amber)','var(--red)'];return`<div class="bar-row"><div class="bar-name">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(a/storeSorted[0][1]*100)}%;background:${cols[i]}"></div></div><div class="bar-amt">${fmt(a)}</div></div>`;}).join('')}</div>`:''}`;
+    ${collapseBlock}`;
   const nav=document.getElementById('stats-month-nav');
   if(nav){let sx=0;nav.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});nav.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>40){if(dx<0&&_statsMonthOffset>-11)statsMonthNav(-1);else if(dx>0&&_statsMonthOffset<0)statsMonthNav(1);}},{passive:true});}
   applyReadOnlyUI();
@@ -1547,7 +1557,7 @@ function renderDevSettings(){return`
     <div class="settings-row" onclick="resetAll()"><div class="settings-label settings-label-danger">Borrar todos los datos</div></div>
   </div></div>
   <div class="settings-section"><div class="settings-section-title">Estadísticas</div><div class="settings-group">
-    <div class="settings-row" onclick="resetStatsConfirm()"><div class="settings-icon settings-icon-reset"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg></div><div class="settings-label">Nuevo mes / Resetear stats</div><div class="settings-arrow">›</div></div>
+    
   </div></div>
   <div class="settings-action-row"><button class="btn-secondary btn-full" onclick="gistActualizar()">Actualizar</button></div>
   <div class="settings-action-row"><button class="btn-secondary btn-full btn-muted" onclick="DB.devMode=false;S.set('devMode',false);saveDB();renderSettings();showToast('Modo desarrollador desactivado')">Ocultar opciones de desarrollador</button></div>`;}
@@ -1698,7 +1708,7 @@ function confirmImport(){
   showScreen('home');
 }
 function resetStatsConfirm(){openModal(`<div class="modal-title">Nuevo mes</div><p class="modal-body-text">Se eliminarán todos los tickets y gastos actuales.</p><label class="modal-checkbox-row"><input type="checkbox" id="keep-despensa" checked> Mantener datos de despensa estimada</label><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-danger" onclick="doResetStats()">Empezar mes nuevo</button></div>`);}
-function doResetStats(){const keepDespensa=document.getElementById('keep-despensa')?.checked!==false;if(keepDespensa){const preds=getPredictions();if(!DB.knowledge)DB.knowledge={products:{},cards:{},cachedDespensa:[]};DB.knowledge.cachedDespensa=preds.map(p=>({name:p.name,freq:p.freq,lastDate:new Date().toISOString().slice(0,10)}));}else{if(DB.knowledge)DB.knowledge.cachedDespensa=[];}DB.tickets=[];DB.expenses=[];DB.settlements=[];saveDB();closeModal();showToast('Mes nuevo iniciado');({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[currentScreen]?.();}
+function doResetStats(){closeModal();showToast('Desactivado: Clarito conserva todos los datos');}
 function resetAll(){openModal(`<div class="modal-title">¿Borrar todo?</div><p class="modal-body-text">No se puede deshacer.</p><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-danger" onclick="localStorage.clear();location.reload()">Borrar todo</button></div>`);}
 
 // ── AI CHAT ───────────────────────────────────────────────────
