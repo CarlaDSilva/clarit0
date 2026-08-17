@@ -5,7 +5,7 @@
 const S={get(k){try{const v=localStorage.getItem('clarito_'+k);return v?JSON.parse(v):null}catch{return null}},set(k,v){localStorage.setItem('clarito_'+k,JSON.stringify(v))}};
 const PRESET_COLORS=['#ea580c','#c2410c','#a855f7','#ec4899','#f9a8d4','#38bdf8','#22c55e','#ef4444','#3b82f6','#eab308','#14b8a6','#e879b0','#fce7f3'];
 
-let DB={apiKey:'',ocrKey:'helloworld',visionKey:'',groqKey:'',gistToken:'',gistId:'',cloudinaryCloud:'',cloudinaryPreset:'',cloudinaryApiKey:'',cloudinarySecret:'',groqStats:{calls:0,firstCall:null,tokensUsed:0},devMode:false,visionStats:{calls:0,firstCall:null},persons:[{id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},{id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}],tickets:[],expenses:[],settlements:[],knowledge:{products:{},cards:{}},aiQuestions:[],aiConvMessages:[]};
+let DB={apiKey:'',ocrKey:'helloworld',visionKey:'',groqKey:'',gistToken:'',gistId:'',cloudinaryCloud:'',cloudinaryPreset:'',cloudinaryApiKey:'',cloudinarySecret:'',cloudinaryWorker:'',cloudinaryWorkerToken:'',groqStats:{calls:0,firstCall:null,tokensUsed:0},devMode:false,visionStats:{calls:0,firstCall:null},persons:[{id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},{id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}],tickets:[],expenses:[],settlements:[],knowledge:{products:{},cards:{}},aiQuestions:[],aiConvMessages:[]};
 
 function loadDB(){const saved=S.get('db');if(saved)DB=Object.assign({},DB,saved);DB.ocrKey=S.get('ocrKey')||DB.ocrKey||'helloworld';DB.visionKey=S.get('visionKey')||DB.visionKey||'';DB.groqKey=S.get('groqKey')||DB.groqKey||'';try{const gs=S.get('groqStats');if(gs)DB.groqStats=JSON.parse(gs);}catch{}try{const vs=S.get('visionStats');if(vs)DB.visionStats=JSON.parse(vs);}catch{}DB.devMode=S.get('devMode')||false;if(!DB.knowledge)DB.knowledge={products:{},cards:{}};if(!DB.aiQuestions)DB.aiQuestions=[];if(!DB.aiConvMessages)DB.aiConvMessages=[];DB.persons.forEach(p=>{if(!p.cards)p.cards=[];});migratePids();try{const settledIds=S.get('settledTicketIds')||[];if(settledIds.length>0){const idSet=new Set(settledIds);DB.tickets.forEach(t=>{if(idSet.has(t.id))t.settled=true;});}}catch(e){}}
 function expireOldTickets(){/* Retención infinita: los datos de tickets NUNCA se borran automáticamente. La gestión por capacidad (borrar solo imágenes al 90%) se hará aparte. */}
@@ -1524,7 +1524,9 @@ function renderSettings(){
     </div>
     ${DB.devMode?renderDevSettings():''}
     <div class="settings-section"><div class="settings-section-title">Almacenamiento</div>
-      <div class="settings-group"><div class="settings-row"><div class="settings-label">Uso local (fotos + datos)</div><div class="settings-value" id="cap-usage">…</div></div></div>
+      <div class="settings-group"><div class="settings-row"><div class="settings-label">Uso local (fotos + datos)</div><div class="settings-value" id="cap-usage">…</div></div>
+        <div class="settings-row" onclick="cloudinaryUsage()"><div class="settings-label">Uso Cloudinary</div><div class="settings-value" id="cld-usage">Pulsa para ver</div><div class="settings-arrow">↻</div></div>
+        <div class="settings-row" onclick="cloudinaryPrunePrompt()"><div class="settings-label">Liberar % de Cloudinary</div><div class="settings-arrow">›</div></div></div>
     </div>
     <p class="settings-footer">Clarito ${APP_VERSION} · Datos guardados localmente</p>`;
   fillCapUsage();
@@ -1542,6 +1544,9 @@ function renderDevSettings(){return`
     <div class="settings-row" onclick="editCloudField('cloudinaryPreset','Upload Preset','mi-preset...')"><div class="settings-label">Upload Preset</div><div class="settings-value">${DB.cloudinaryPreset||'No configurado'}</div><div class="settings-arrow">›</div></div>
     <div class="settings-row" onclick="editCloudField('cloudinaryApiKey','API Key','123456789...')"><div class="settings-label">API Key</div><div class="settings-value">${DB.cloudinaryApiKey?'•••'+DB.cloudinaryApiKey.slice(-4):'No configurado'}</div><div class="settings-arrow">›</div></div>
     <div class="settings-row" onclick="editCloudSecret()"><div class="settings-label">API Secret</div><div class="settings-value">${DB.cloudinarySecret?'•••'+DB.cloudinarySecret.slice(-4):'No configurado'}</div><div class="settings-arrow">›</div></div>
+    <div class="settings-row" onclick="editCloudField('cloudinaryWorker','URL del Worker','https://...workers.dev')"><div class="settings-label">Worker (borrado/uso)</div><div class="settings-value">${DB.cloudinaryWorker?'Configurado':'No configurado'}</div><div class="settings-arrow">›</div></div>
+    <div class="settings-row" onclick="editCloudField('cloudinaryWorkerToken','Token del Worker','la contraseña que pusiste en el Worker')"><div class="settings-label">Token del Worker</div><div class="settings-value">${DB.cloudinaryWorkerToken?'•••':'No configurado'}</div><div class="settings-arrow">›</div></div>
+    <div class="settings-row"><div class="settings-label" style="color:var(--txt3);font-size:12px">Con el Worker activo, API Key y API Secret ya no se usan en la app: puedes borrarlos.</div></div>
     <div class="settings-row"><div class="settings-label" style="color:var(--txt3);font-size:12px">${CloudImg._hasConfig()?'Configurado — fotos en la nube':'Sin configurar — fotos solo locales'}</div></div>
   </div></div>
   <div class="settings-section"><div class="settings-section-title">APIs</div><div class="settings-group">
@@ -1661,6 +1666,7 @@ function exportData(){
   delete exp.apiKey;
   delete exp.cloudinarySecret;
   delete exp.cloudinaryApiKey;
+  delete exp.cloudinaryWorkerToken;
   delete exp.aiConvMessages;
   const b=new Blob([JSON.stringify(exp,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);
@@ -1750,49 +1756,11 @@ const ImgDB = {
     try{const db=await this.open();return new Promise((res,rej)=>{const req=db.transaction('images').objectStore('images').get(ticketId);req.onsuccess=()=>res(req.result||null);req.onerror=()=>res(null);});}catch{return null;}
   },
   async delete(ticketId){
-    try{const db=await this.open();const tx=db.transaction('images','readwrite');tx.objectStore('images').delete(ticketId);}catch(e){}
-  }
-};
-
-// ── CLOUDINARY — almacén remoto de imágenes ───────────────────
-const CloudImg = {
-  _hasConfig(){ return !!(DB.cloudinaryCloud && DB.cloudinaryPreset); },
-
-  async upload(ticketId, b64jpeg){
-    if(!this._hasConfig()) return null;
-    try{
-      const form=new FormData();
-      form.append('file','data:image/jpeg;base64,'+b64jpeg);
-      form.append('upload_preset', DB.cloudinaryPreset);
-      form.append('public_id', 'clarito_'+ticketId);
-      form.append('folder','clarito');
-      const res=await fetch(`https://api.cloudinary.com/v1_1/${DB.cloudinaryCloud}/image/upload`,{method:'POST',body:form});
-      if(!res.ok) throw new Error('HTTP '+res.status);
-      const data=await res.json();
-      return data.secure_url||null;
-    }catch(e){console.warn('Cloudinary upload error:',e.message);return null;}
-  },
-
-  async delete(ticketId){
-    if(!this._hasConfig()||!DB.cloudinarySecret) return;
+    if(!DB.cloudinaryWorker) return; // sin Worker no se borra en la nube; se hace desde su panel
     try{
       const publicId='clarito/clarito_'+ticketId;
-      const ts=Math.round(Date.now()/1000);
-      // Signature: SHA1 of "public_id=X&timestamp=T" + secret
-      // Can't do SHA1 in browser without crypto subtle — use destroy via unsigned if allowed
-      // Use Cloudinary unsigned delete with delete_token not available
-      // Best approach: store public_id in ticket and use Admin API via fetch with basic auth
-      const str=`public_id=${publicId}&timestamp=${ts}${DB.cloudinarySecret}`;
-      const msgBuffer=new TextEncoder().encode(str);
-      const hashBuffer=await crypto.subtle.digest('SHA-1',msgBuffer);
-      const sig=Array.from(new Uint8Array(hashBuffer)).map(b=>b.toString(16).padStart(2,'0')).join('');
-      const form=new FormData();
-      form.append('public_id',publicId);
-      form.append('timestamp',ts);
-      form.append('api_key',DB.cloudinaryApiKey||'');
-      form.append('signature',sig);
-      await fetch(`https://api.cloudinary.com/v1_1/${DB.cloudinaryCloud}/image/destroy`,{method:'POST',body:form});
-    }catch(e){console.warn('Cloudinary delete error:',e.message);}
+      await fetch(DB.cloudinaryWorker.replace(/\/$/,'')+'/destroy',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')},body:JSON.stringify({public_id:publicId})});
+    }catch(e){console.warn('Cloudinary delete (worker) error:',e.message);}
   },
 
   async getUrl(ticketId){
@@ -1851,6 +1819,35 @@ async function fillCapUsage(){
   if(!el) return;
   const r=await Cap.ratio();
   el.textContent=r?(Math.round(r.ratio*100)+'% · '+(r.usage/1048576).toFixed(1)+' / '+(r.quota/1048576).toFixed(0)+' MB'):'No disponible';
+}
+async function cloudinaryUsage(){
+  const el=document.getElementById('cld-usage');
+  if(!DB.cloudinaryWorker){if(el)el.textContent='Falta URL del Worker';return;}
+  if(el)el.textContent='Cargando...';
+  try{
+    const r=await fetch(DB.cloudinaryWorker.replace(/\/$/,'')+'/usage',{headers:{'Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')}});
+    const d=await r.json();
+    if(!r.ok){if(el)el.textContent='Error '+(r.status);return;}
+    const pct=d.percent!=null?Math.round(d.percent)+'%':'—';
+    const mb=d.usedBytes?(' · '+(d.usedBytes/1048576).toFixed(0)+' MB'):'';
+    if(el)el.textContent=pct+mb;
+  }catch(e){if(el)el.textContent='Sin conexión';}
+}
+function cloudinaryPrunePrompt(){
+  if(!DB.cloudinaryWorker){showToast('Configura la URL del Worker');return;}
+  openModal(`<div class="modal-title">Liberar espacio en Cloudinary</div><p class="modal-body-text">Borra las imágenes más antiguas de la carpeta. Elige cuánto:</p><div class="field-row"><label class="field-label">Porcentaje a borrar</label><input id="prune-pct" type="number" value="20" min="1" max="100"/></div><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-danger" onclick="cloudinaryPrune()">Borrar</button></div>`);
+}
+async function cloudinaryPrune(){
+  const pct=parseInt(document.getElementById('prune-pct')?.value);
+  if(!pct||pct<1){showToast('Introduce un porcentaje');return;}
+  closeModal();showToast('Borrando en Cloudinary...');
+  try{
+    const r=await fetch(DB.cloudinaryWorker.replace(/\/$/,'')+'/prune',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')},body:JSON.stringify({percent:pct})});
+    const d=await r.json();
+    if(!r.ok){showToast('Error: '+(d.error||r.status),4000);return;}
+    showToast('Borradas '+d.deleted+' de '+d.total+' imágenes',4000);
+    cloudinaryUsage();
+  }catch(e){showToast('Sin conexión con el Worker',4000);}
 }
 
 // ── SHARE TARGET — recibir imagen compartida desde galería ────
@@ -1914,6 +1911,7 @@ const GistSync = {
       delete payload.apiKey;
       delete payload.cloudinarySecret;
       delete payload.cloudinaryApiKey;
+      delete payload.cloudinaryWorkerToken;
       payload._syncedAt = new Date().toISOString();
       const res = await fetch(`https://api.github.com/gists/${DB.gistId}`,{
         method:'PATCH',
