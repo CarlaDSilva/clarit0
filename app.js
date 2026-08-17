@@ -946,7 +946,7 @@ async function enviarReleer(){
 
 function saveTicket(){
   if(window._savingTicket)return;window._savingTicket=true;
-  try{const t=currentTicket;if(!t){window._savingTicket=false;return;}try{document.querySelectorAll('.product-price-input').forEach((el,i)=>{if(el.value&&t.products&&t.products[i]){t.products[i].unitPrice=parsePrice(el.value);t.products[i].finalPrice=parseFloat((t.products[i].unitPrice*(t.products[i].qty||1)).toFixed(2));}});}catch(e){}t.confirmed=true;t.createdAt=t.createdAt||new Date().toISOString().slice(0,10);if(!t.total||t.total===0)t.total=(t.products||[]).reduce((s,p)=>s+parseFloat(p.finalPrice||p.price||0),0);learnFromTicket(t);const tS={...t};delete tS._imageB64;const idx=DB.tickets.findIndex(x=>x.id===t.id);if(idx>=0)DB.tickets[idx]=tS;else DB.tickets.push(tS);saveDB();}finally{window._savingTicket=false;}
+  try{const t=currentTicket;if(!t){window._savingTicket=false;return;}try{document.querySelectorAll('.product-price-input').forEach((el,i)=>{if(el.value&&t.products&&t.products[i]){t.products[i].unitPrice=parsePrice(el.value);t.products[i].finalPrice=parseFloat((t.products[i].unitPrice*(t.products[i].qty||1)).toFixed(2));}});}catch(e){}t.confirmed=true;t.createdAt=t.createdAt||new Date().toISOString().slice(0,10);if(!t.total||t.total===0)t.total=(t.products||[]).reduce((s,p)=>s+parseFloat(p.finalPrice||p.price||0),0);learnFromTicket(t);const tS={...t};delete tS._imageB64;const idx=DB.tickets.findIndex(x=>x.id===t.id);if(idx>=0)DB.tickets[idx]=tS;else DB.tickets.push(tS);saveDB();Cap.check();}finally{window._savingTicket=false;}
   closeTicketEditor();showToast('Ticket guardado');const ts=currentScreen==='tickets'?'tickets':'home';currentScreen=ts;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[ts]?.();GistSync.push();
 }
 function learnFromTicket(t){if(t.last4&&t.payer){DB.knowledge.cards[t.last4]=t.payer;const person=personById(t.payer);if(person){if(!person.cards)person.cards=[];if(!person.cards.includes(t.last4))person.cards.push(t.last4);}}(t.products||[]).forEach(prod=>{const key=normalizeKey(prod.name||'');if(!key)return;const ocrRaw=(prod.rawName||'').trim().toUpperCase();const ex=DB.knowledge.products[key]||{count:0,ocr_raw:[]};DB.knowledge.products[key]={pid:ex.pid||_pid(),person:prod.assignedTo||null,shared:!prod.assignedTo,pct1:prod.pct1||50,count:(ex.count||0)+1,category:prod.category,alias:prod.name,ocr_raw:ocrRaw&&!(ex.ocr_raw||[]).includes(ocrRaw)?[...(ex.ocr_raw||[]),ocrRaw]:(ex.ocr_raw||[])};const ocrStripped=ocrRaw.replace(/^\d+\s+/,'');[ocrRaw,ocrStripped].filter(Boolean).forEach(raw=>{const rk=normalizeKey(raw);if(rk&&rk!==key)DB.knowledge.products[rk]={...(DB.knowledge.products[rk]||{}),pid:DB.knowledge.products[key].pid,person:prod.assignedTo||null,shared:!prod.assignedTo,pct1:prod.pct1||50,alias:prod.name,ocr_raw:[raw]};});});}
@@ -1523,7 +1523,11 @@ function renderSettings(){
       </div>
     </div>
     ${DB.devMode?renderDevSettings():''}
+    <div class="settings-section"><div class="settings-section-title">Almacenamiento</div>
+      <div class="settings-group"><div class="settings-row"><div class="settings-label">Uso local (fotos + datos)</div><div class="settings-value" id="cap-usage">…</div></div></div>
+    </div>
     <p class="settings-footer">Clarito ${APP_VERSION} · Datos guardados localmente</p>`;
+  fillCapUsage();
   applyReadOnlyUI();
 }
 function renderDevSettings(){return`
@@ -1798,6 +1802,57 @@ const CloudImg = {
   }
 };
 
+
+// ── CAPACIDAD: válvula de almacenamiento local ──
+const Cap = {
+  async ratio(){
+    try{
+      if(!navigator.storage||!navigator.storage.estimate) return null;
+      const {usage,quota}=await navigator.storage.estimate();
+      if(!quota) return null;
+      return {usage:usage||0,quota,ratio:(usage||0)/quota};
+    }catch(e){return null;}
+  },
+  async requestPersist(){
+    try{
+      if(navigator.storage&&navigator.storage.persist){
+        const already=navigator.storage.persisted?await navigator.storage.persisted():false;
+        if(!already) await navigator.storage.persist();
+      }
+    }catch(e){}
+  },
+  async check(){
+    const r=await this.ratio();
+    if(!r) return;
+    if(r.ratio>=0.90) await this.pruneLocalImages(0.75);
+  },
+  async pruneLocalImages(floor){
+    const oldestFirst=DB.tickets.slice().sort((a,b)=>new Date(a.createdAt||a.date||0)-new Date(b.createdAt||b.date||0));
+    let freed=0;
+    for(const t of oldestFirst){
+      const cur=await this.ratio();
+      if(cur&&cur.ratio<=floor) break;
+      let had=null;
+      try{had=await ImgDB.get(t.id);}catch(e){}
+      if(had){
+        try{await ImgDB.delete(t.id);}catch(e){}
+        t.imgFreed=true;
+        freed++;
+      }
+    }
+    if(freed>0){
+      saveDB();
+      showToast('Espacio casi lleno: liberadas '+freed+' imágenes antiguas del dispositivo. La información se conserva.',5000);
+    }
+  }
+};
+async function fillCapUsage(){
+  const el=document.getElementById('cap-usage');
+  if(!el) return;
+  const r=await Cap.ratio();
+  el.textContent=r?(Math.round(r.ratio*100)+'% · '+(r.usage/1048576).toFixed(1)+' / '+(r.quota/1048576).toFixed(0)+' MB'):'No disponible';
+}
+
 // ── SHARE TARGET — recibir imagen compartida desde galería ────
 async function handleShareTarget(){
   if(location.search.includes('share-target')||new URLSearchParams(location.search).has('share-target')) return;
@@ -2016,7 +2071,7 @@ async function gistActualizar(){
 // ── BOOT ──────────────────────────────────────────────────────
 loadDB();
 DB.aiConvMessages=[];
-expireOldTickets();
+expireOldTickets();Cap.requestPersist();Cap.check();
 handleShareTarget();
 setTimeout(()=>{
   hideSplash();
