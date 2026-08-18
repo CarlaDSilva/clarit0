@@ -51,7 +51,7 @@ function hideSplash(){const s=document.getElementById('splash');s.classList.add(
 let currentScreen='home';
 function showScreen(name){currentScreen=name;document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('nav-'+name)?.classList.add('active');document.getElementById('view').scrollTop=0;if(name==='stats')_statsMonthOffset=0;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();updateAIBadge();}
 
-let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.0.2 · Lavanda';
+let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.0.3 · Lavanda';
 // setupStep: -1=bienvenida, 0=API keys, 1=personas, 2=nombres/colores, 3=listo
 function startSetup(){document.getElementById('setup-screen').style.display='flex';setupStep=-1;renderSetupStep();}
 function renderSetupStep(){
@@ -1654,7 +1654,23 @@ function removePerson(idx){if(DB.persons.length<=1){showToast('Debe haber al men
 function savePerson(idx){const n=document.getElementById('ep-name').value.trim();if(n)DB.persons[idx].name=n;saveDB();closeModal();renderSettings();}
 function forgetCard(l4){delete DB.knowledge.cards[l4];DB.persons.forEach(p=>{if(p.cards)p.cards=p.cards.filter(c=>c!==l4);});saveDB();renderSettings();}
 let _devTaps=0,_devTimer=null;
-function onLogoTap(){_devTaps++;clearTimeout(_devTimer);if(_devTaps>=13){_devTaps=0;DB.devMode=!DB.devMode;S.set('devMode',DB.devMode);saveDB();renderSettings();showToast(DB.devMode?'Modo desarrollador activado':'Modo desarrollador desactivado',2000);}else{_devTimer=setTimeout(()=>{_devTaps=0;},1200);}}
+function toggleEruda(){
+  if(window._erudaOn){ try{eruda.destroy();}catch(e){} window._erudaOn=false; showToast('Eruda desactivado',1500); return; }
+  if(window.eruda){ try{eruda.init();window._erudaOn=true;showToast('Eruda activado',1500);}catch(e){showToast('Error al iniciar Eruda',2000);} return; }
+  const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/eruda';
+  s.onload=()=>{ try{eruda.init();window._erudaOn=true;showToast('Eruda activado',1500);}catch(e){showToast('Error al iniciar Eruda',2000);} };
+  s.onerror=()=>showToast('No se pudo cargar Eruda (sin conexión)',2500);
+  document.body.appendChild(s);
+}
+function onLogoTap(){
+  _devTaps++; clearTimeout(_devTimer);
+  if(_devTaps%3===0) toggleEruda();                 // cada 3 taps: alterna Eruda (activa/desactiva)
+  if(_devTaps>=13){                                  // 13 taps: alterna modo desarrollador (gesto existente)
+    _devTaps=0; DB.devMode=!DB.devMode; S.set('devMode',DB.devMode); saveDB(); renderSettings();
+    showToast(DB.devMode?'Modo desarrollador activado':'Modo desarrollador desactivado',2000); return;
+  }
+  _devTimer=setTimeout(()=>{_devTaps=0;},1200);
+}
 function clearKnowledge(){openModal(`<div class="modal-title">¿Borrar conocimiento?</div><p class="modal-body-text">Se eliminan los productos aprendidos. Los tickets se conservan.</p><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-danger" onclick="DB.knowledge.products={};saveDB();closeModal();renderSettings();showToast('Borrado')">Borrar</button></div>`);}
 function editVisionKey(){openModal(`<div class="modal-title">Google Cloud Vision Key</div><p class="modal-hint">Obtén tu key en <strong class="text-accent">console.cloud.google.com</strong> → APIs → Credenciales</p><input type="password" id="new-visionkey" value="${DB.visionKey||''}" placeholder="AIzaSy..."/><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-primary" onclick="const k=document.getElementById('new-visionkey').value.trim();if(!k)return;DB.visionKey=k;S.set('visionKey',k);saveDB();closeModal();showToast('Guardada');renderSettings()">Guardar</button></div>`);}
 function editGroqKey(){openModal(`<div class="modal-title">Groq API Key</div><p class="modal-hint">Key gratuita en <strong class="text-accent">console.groq.com</strong> → API Keys</p><input type="password" id="new-groqkey" value="${DB.groqKey||''}" placeholder="gsk_..."/><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-primary" onclick="const k=document.getElementById('new-groqkey').value.trim();if(!k)return;DB.groqKey=k;S.set('groqKey',k);saveDB();closeModal();showToast('Guardada');renderSettings()">Guardar</button></div>`);}
