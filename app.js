@@ -5,9 +5,9 @@
 const S={get(k){try{const v=localStorage.getItem('clarito_'+k);return v?JSON.parse(v):null}catch{return null}},set(k,v){localStorage.setItem('clarito_'+k,JSON.stringify(v))}};
 const PRESET_COLORS=['#ea580c','#c2410c','#a855f7','#ec4899','#f9a8d4','#38bdf8','#22c55e','#ef4444','#3b82f6','#eab308','#14b8a6','#e879b0','#fce7f3'];
 
-let DB={apiKey:'',ocrKey:'helloworld',visionKey:'',groqKey:'',gistToken:'',gistId:'',cloudinaryCloud:'',cloudinaryPreset:'',cloudinaryApiKey:'',cloudinarySecret:'',cloudinaryWorker:'',cloudinaryWorkerToken:'',groqStats:{calls:0,firstCall:null,tokensUsed:0},devMode:false,visionStats:{calls:0,firstCall:null},persons:[{id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},{id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}],tickets:[],expenses:[],settlements:[],knowledge:{products:{},cards:{}},aiQuestions:[],aiConvMessages:[]};
+let DB={apiKey:'',ocrKey:'helloworld',visionKey:'',groqKey:'',gistToken:'',gistId:'',cloudinaryCloud:'',cloudinaryPreset:'',cloudinaryApiKey:'',cloudinarySecret:'',cloudinaryWorker:'',cloudinaryWorkerToken:'',groqStats:{calls:0,firstCall:null,tokensUsed:0},devMode:false,visionStats:{calls:0,firstCall:null},persons:[{id:'p1',name:'Persona 1',color:'#7c6ef5',cards:[]},{id:'p2',name:'Persona 2',color:'#3ecf8e',cards:[]}],tickets:[],expenses:[],settlements:[],knowledge:{products:{},cards:{}},aiQuestions:[],aiConvMessages:[],deletedIds:[]};
 
-function loadDB(){const saved=S.get('db');if(saved)DB=Object.assign({},DB,saved);DB.ocrKey=S.get('ocrKey')||DB.ocrKey||'helloworld';DB.visionKey=S.get('visionKey')||DB.visionKey||'';DB.groqKey=S.get('groqKey')||DB.groqKey||'';try{const gs=S.get('groqStats');if(gs)DB.groqStats=JSON.parse(gs);}catch{}try{const vs=S.get('visionStats');if(vs)DB.visionStats=JSON.parse(vs);}catch{}DB.devMode=S.get('devMode')||false;if(!DB.knowledge)DB.knowledge={products:{},cards:{}};if(!DB.knowledge.products)DB.knowledge.products={};if(!DB.knowledge.cards)DB.knowledge.cards={};if(!DB.aiQuestions)DB.aiQuestions=[];if(!DB.aiConvMessages)DB.aiConvMessages=[];DB.persons.forEach(p=>{if(!p.cards)p.cards=[];});migratePids();try{const settledIds=S.get('settledTicketIds')||[];if(settledIds.length>0){const idSet=new Set(settledIds);DB.tickets.forEach(t=>{if(idSet.has(t.id))t.settled=true;});}}catch(e){}}
+function loadDB(){const saved=S.get('db');if(saved)DB=Object.assign({},DB,saved);DB.ocrKey=S.get('ocrKey')||DB.ocrKey||'helloworld';DB.visionKey=S.get('visionKey')||DB.visionKey||'';DB.groqKey=S.get('groqKey')||DB.groqKey||'';try{const gs=S.get('groqStats');if(gs)DB.groqStats=JSON.parse(gs);}catch{}try{const vs=S.get('visionStats');if(vs)DB.visionStats=JSON.parse(vs);}catch{}DB.devMode=S.get('devMode')||false;if(!DB.knowledge)DB.knowledge={products:{},cards:{}};if(!DB.knowledge.products)DB.knowledge.products={};if(!DB.knowledge.cards)DB.knowledge.cards={};if(!DB.aiQuestions)DB.aiQuestions=[];if(!DB.aiConvMessages)DB.aiConvMessages=[];if(!Array.isArray(DB.deletedIds))DB.deletedIds=[];DB.persons.forEach(p=>{if(!p.cards)p.cards=[];});migratePids();try{const settledIds=S.get('settledTicketIds')||[];if(settledIds.length>0){const idSet=new Set(settledIds);DB.tickets.forEach(t=>{if(idSet.has(t.id))t.settled=true;});}}catch(e){}}
 function expireOldTickets(){/* Retención infinita: los datos de tickets NUNCA se borran automáticamente. La gestión por capacidad (borrar solo imágenes al 90%) se hará aparte. */}
 function saveDB(){try{S.set('db',JSON.parse(JSON.stringify(DB)));}catch(e){console.error('saveDB error:',e);}}
 
@@ -51,7 +51,7 @@ function hideSplash(){const s=document.getElementById('splash');s.classList.add(
 let currentScreen='home';
 function showScreen(name){currentScreen=name;document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('nav-'+name)?.classList.add('active');document.getElementById('view').scrollTop=0;if(name==='stats')_statsMonthOffset=0;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();updateAIBadge();}
 
-let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.0.3 · Lavanda';
+let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.1.0 · Lavanda';
 // setupStep: -1=bienvenida, 0=API keys, 1=personas, 2=nombres/colores, 3=listo
 function startSetup(){document.getElementById('setup-screen').style.display='flex';setupStep=-1;renderSetupStep();}
 function renderSetupStep(){
@@ -946,7 +946,7 @@ async function enviarReleer(){
 
 function saveTicket(){
   if(window._savingTicket)return;window._savingTicket=true;
-  try{const t=currentTicket;if(!t){window._savingTicket=false;return;}try{document.querySelectorAll('.product-price-input').forEach((el,i)=>{if(el.value&&t.products&&t.products[i]){t.products[i].unitPrice=parsePrice(el.value);t.products[i].finalPrice=parseFloat((t.products[i].unitPrice*(t.products[i].qty||1)).toFixed(2));}});}catch(e){}t.confirmed=true;t.createdAt=t.createdAt||new Date().toISOString().slice(0,10);if(!t.total||t.total===0)t.total=(t.products||[]).reduce((s,p)=>s+parseFloat(p.finalPrice||p.price||0),0);learnFromTicket(t);const tS={...t};delete tS._imageB64;const idx=DB.tickets.findIndex(x=>x.id===t.id);if(idx>=0)DB.tickets[idx]=tS;else DB.tickets.push(tS);saveDB();Cap.check();}finally{window._savingTicket=false;}
+  try{const t=currentTicket;if(!t){window._savingTicket=false;return;}try{document.querySelectorAll('.product-price-input').forEach((el,i)=>{if(el.value&&t.products&&t.products[i]){t.products[i].unitPrice=parsePrice(el.value);t.products[i].finalPrice=parseFloat((t.products[i].unitPrice*(t.products[i].qty||1)).toFixed(2));}});}catch(e){}t.confirmed=true;t.createdAt=t.createdAt||new Date().toISOString().slice(0,10);if(!t.total||t.total===0)t.total=(t.products||[]).reduce((s,p)=>s+parseFloat(p.finalPrice||p.price||0),0);learnFromTicket(t);const tS={...t};delete tS._imageB64;tS.lastUpdated=new Date().toISOString();const idx=DB.tickets.findIndex(x=>x.id===t.id);if(idx>=0)DB.tickets[idx]=tS;else DB.tickets.push(tS);saveDB();Cap.check();}finally{window._savingTicket=false;}
   closeTicketEditor();showToast('Ticket guardado');const ts=currentScreen==='tickets'?'tickets':'home';currentScreen=ts;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[ts]?.();GistSync.push();
 }
 function learnFromTicket(t){if(t.last4&&t.payer){DB.knowledge.cards[t.last4]=t.payer;const person=personById(t.payer);if(person){if(!person.cards)person.cards=[];if(!person.cards.includes(t.last4))person.cards.push(t.last4);}}(t.products||[]).forEach(prod=>{const key=normalizeKey(prod.name||'');if(!key)return;const ocrRaw=(prod.rawName||'').trim().toUpperCase();const ex=DB.knowledge.products[key]||{count:0,ocr_raw:[]};DB.knowledge.products[key]={pid:ex.pid||_pid(),person:prod.assignedTo||null,shared:!prod.assignedTo,pct1:prod.pct1||50,count:(ex.count||0)+1,category:prod.category,alias:prod.name,ocr_raw:ocrRaw&&!(ex.ocr_raw||[]).includes(ocrRaw)?[...(ex.ocr_raw||[]),ocrRaw]:(ex.ocr_raw||[])};const ocrStripped=ocrRaw.replace(/^\d+\s+/,'');[ocrRaw,ocrStripped].filter(Boolean).forEach(raw=>{const rk=normalizeKey(raw);if(rk&&rk!==key)DB.knowledge.products[rk]={...(DB.knowledge.products[rk]||{}),pid:DB.knowledge.products[key].pid,person:prod.assignedTo||null,shared:!prod.assignedTo,pct1:prod.pct1||50,alias:prod.name,ocr_raw:[raw]};});});}
@@ -981,7 +981,7 @@ async function mejorarTicket(){
 }
 function closeTicketEditor(){document.getElementById('ticket-editor').style.display='none';currentTicket=null;window._lastTicketB64=null;_releerMode=false;}
 function deleteCurrentTicket(){if(!currentTicket)return;window._deleteTicketId=currentTicket.id;const t=currentTicket;openModal(`<div class="modal-title">Eliminar ticket</div><p class="modal-body-text">¿Eliminar el ticket de ${t.store||'este supermercado'}?</p><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-danger" onclick="confirmDeleteTicket()">Eliminar</button></div>`);}
-function confirmDeleteTicket(){const id=window._deleteTicketId;if(!id){closeModal();return;}const t=DB.tickets.find(tk=>tk.id===id);if(t){DB.tickets=DB.tickets.filter(tk=>tk.id!==id);saveDB();}ImgDB.delete(id);CloudImg.delete(id);window._deleteTicketId=null;closeModal();closeTicketEditor();showToast('Ticket eliminado');showScreen(currentScreen==='tickets'?'tickets':'home');}
+function confirmDeleteTicket(){const id=window._deleteTicketId;if(!id){closeModal();return;}const t=DB.tickets.find(tk=>tk.id===id);if(t){DB.tickets=DB.tickets.filter(tk=>tk.id!==id);if(!DB.deletedIds.includes(id))DB.deletedIds.push(id);saveDB();GistSync.push();}ImgDB.delete(id);CloudImg.delete(id);window._deleteTicketId=null;closeModal();closeTicketEditor();showToast('Ticket eliminado');showScreen(currentScreen==='tickets'?'tickets':'home');}
 function openManualTicket(){openTicketEditor(getEmptyTicket());}
 function editItem(id){const t=DB.tickets.find(x=>x.id===id);if(t){openTicketEditor(t);return;}const e=DB.expenses.find(x=>x.id===id);if(e)openExpenseEditor(e);}
 
@@ -1014,8 +1014,8 @@ function setExpenseCat(c){currentExpense.category=c;renderManualExpenseSheet();}
 function setExpensePayer(id){currentExpense.payer=id;renderManualExpenseSheet();}
 function updateMeSplit(v){currentExpense.split1=parseInt(v);document.getElementById('me-sp1').textContent=v+'%';document.getElementById('me-sp2').textContent=(100-parseInt(v))+'%';}
 function setMeQuickSplit(v){currentExpense.split1=v;document.getElementById('me-split-range').value=v;updateMeSplit(v);}
-function saveManualExpense(){if(!currentExpense.total||currentExpense.total<=0){showToast('Introduce un importe');return;}currentExpense.confirmed=true;currentExpense.store=currentExpense.description||(EXPENSE_CATS.find(c=>c.id===currentExpense.category)||{}).label||'Gasto';const idx=DB.expenses.findIndex(e=>e.id===currentExpense.id);if(idx>=0)DB.expenses[idx]=currentExpense;else DB.expenses.push(currentExpense);saveDB();GistSync.push();closeManualExpense();showToast('Gasto guardado');showScreen(currentScreen);}
-function deleteExpense(){DB.expenses=DB.expenses.filter(e=>e.id!==currentExpense.id);saveDB();closeManualExpense();showToast('Gasto eliminado');showScreen(currentScreen);}
+function saveManualExpense(){if(!currentExpense.total||currentExpense.total<=0){showToast('Introduce un importe');return;}currentExpense.confirmed=true;currentExpense.store=currentExpense.description||(EXPENSE_CATS.find(c=>c.id===currentExpense.category)||{}).label||'Gasto';currentExpense.lastUpdated=new Date().toISOString();const idx=DB.expenses.findIndex(e=>e.id===currentExpense.id);if(idx>=0)DB.expenses[idx]=currentExpense;else DB.expenses.push(currentExpense);saveDB();GistSync.push();closeManualExpense();showToast('Gasto guardado');showScreen(currentScreen);}
+function deleteExpense(){const _eid=currentExpense.id;DB.expenses=DB.expenses.filter(e=>e.id!==_eid);if(_eid&&!DB.deletedIds.includes(_eid))DB.deletedIds.push(_eid);saveDB();GistSync.push();closeManualExpense();showToast('Gasto eliminado');showScreen(currentScreen);}
 function closeManualExpense(){document.getElementById('me-sheet').style.display='none';currentExpense=null;}
 
 // ── BALANCE ───────────────────────────────────────────────────
@@ -1987,43 +1987,119 @@ const GistSync = {
   },
 
   async _merge(remote){
-    const localAt  = DB._syncedAt  ? new Date(DB._syncedAt)  : null;
+    // Nunca traer claves sensibles ni devMode desde el Gist
+    ['visionKey','groqKey','gistToken','apiKey','cloudinarySecret','cloudinaryApiKey','cloudinaryWorkerToken','devMode','aiConvMessages'].forEach(k=>{ delete remote[k]; });
+
     const remoteAt = remote._syncedAt ? new Date(remote._syncedAt) : null;
-
-    // Si los timestamps son iguales o no hay datos remotos útiles → no hacer nada
+    const localAt  = DB._syncedAt ? new Date(DB._syncedAt) : null;
     if(!remoteAt) return;
-    if(localAt && Math.abs(localAt-remoteAt) < 2000) return; // <2s de diferencia → misma versión
+    if(localAt && Math.abs(localAt-remoteAt) < 2000) return; // misma versión → nada que fusionar
 
-    // Si local no tiene timestamp → aceptar remoto directamente
-    if(!localAt){
-      this._applyRemote(remote);
-      showToast('Datos sincronizados desde Gist',2500);
-      return;
-    }
+    const ts = x => (x && x.lastUpdated) ? new Date(x.lastUpdated).getTime() : 0;
+    const canon = o => { const c={}; delete o.lastUpdated; Object.keys(o).sort().forEach(k=>{ if(k!=='settled'&&k!=='lastUpdated') c[k]=o[k]; }); return JSON.stringify(c); };
+    const deleted = new Set([...(DB.deletedIds||[]), ...(remote.deletedIds||[])]);
+    const conflicts = [];
 
-    // Conflicto real → preguntar
-    const fmtDt = iso => {
-      const d = new Date(iso);
-      return d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})
-        + ' ' + d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    // Fusión por id: unión, gana lastUpdated más reciente, settled monótono (O lógico)
+    const mergeRecords = (localArr, remoteArr, type) => {
+      const map = new Map();
+      (localArr||[]).forEach(x=>{ if(x&&x.id) map.set(x.id, x); });
+      (remoteArr||[]).forEach(r=>{
+        if(!r||!r.id) return;
+        const l = map.get(r.id);
+        if(!l){ map.set(r.id, r); return; }
+        const settled = !!(l.settled || r.settled);
+        const tl=ts(l), tr=ts(r);
+        if(canon({...l})===canon({...r})){ map.set(r.id, {...(tr>tl?r:l), settled}); return; }
+        if(tr>tl){ map.set(r.id, {...r, settled}); }
+        else if(tl>tr){ map.set(r.id, {...l, settled}); }
+        else { conflicts.push({type, id:r.id, local:{...l,settled}, remote:{...r,settled}}); map.set(r.id, {...l, settled}); }
+      });
+      return [...map.values()].filter(x=>!deleted.has(x.id));
     };
-    const localStr  = fmtDt(DB._syncedAt);
-    const remoteStr = fmtDt(remote._syncedAt);
 
-    window._pendingRemote=remote;
+    const mergedTickets  = mergeRecords(DB.tickets,  remote.tickets,  'ticket');
+    const mergedExpenses = mergeRecords(DB.expenses, remote.expenses, 'gasto');
+
+    // Liquidaciones: unión por id, NUNCA se descarta ninguna
+    const sMap=new Map();
+    (DB.settlements||[]).forEach(s=>{ if(s) sMap.set(s.id||JSON.stringify(s), s); });
+    (remote.settlements||[]).forEach(s=>{ if(s){ const k=s.id||JSON.stringify(s); if(!sMap.has(k)) sMap.set(k,s); } });
+    const mergedSettlements=[...sMap.values()];
+
+    // Conocimiento: unión por clave (local prevalece en empate)
+    const kp={...(remote.knowledge&&remote.knowledge.products||{}), ...(DB.knowledge&&DB.knowledge.products||{})};
+    const kc={...(remote.knowledge&&remote.knowledge.cards||{}), ...(DB.knowledge&&DB.knowledge.cards||{})};
+
+    // Personas: unión por id, local prevalece
+    const pMap=new Map();
+    (remote.persons||[]).forEach(p=>{ if(p&&p.id) pMap.set(p.id,p); });
+    (DB.persons||[]).forEach(p=>{ if(p&&p.id) pMap.set(p.id,p); });
+    const mergedPersons = pMap.size ? [...pMap.values()] : DB.persons;
+
+    const changed =
+      JSON.stringify(mergedTickets)!==JSON.stringify(DB.tickets) ||
+      JSON.stringify(mergedExpenses)!==JSON.stringify(DB.expenses) ||
+      JSON.stringify(mergedSettlements)!==JSON.stringify(DB.settlements) ||
+      deleted.size!==(DB.deletedIds||[]).length;
+
+    DB.tickets=mergedTickets;
+    DB.expenses=mergedExpenses;
+    DB.settlements=mergedSettlements;
+    DB.knowledge={products:kp,cards:kc};
+    DB.persons=mergedPersons;
+    DB.deletedIds=[...deleted];
+
+    try{ S.set('settledTicketIds', DB.tickets.filter(t=>t.settled).map(t=>t.id)); }catch(e){}
+
+    const _pidChanged = migratePids();
+    saveDB();
+    if(GistSync.isAdmin() && (changed || _pidChanged)) GistSync.push();
+    showScreen(currentScreen);
+    updateAIBadge();
+
+    if(conflicts.length){ window._syncConflicts=conflicts; this._resolveConflicts(); }
+    else if(changed){ showToast('Se combinaron los cambios del Gist',2500); }
+  },
+
+  _resolveConflicts(){
+    const list = window._syncConflicts||[];
+    if(!list.length) return;
+    const c = list[0];
+    const brief = r => {
+      const store=r.store||r.description||'(sin nombre)';
+      const amt=(r.total!=null?r.total:(r.amount!=null?r.amount:''));
+      const d=r.date||r.createdAt||r.lastUpdated||'';
+      const dd=d?new Date(d).toLocaleDateString('es-ES',{day:'2-digit',month:'short'}):'';
+      return `${store}${amt!==''?' · '+fmt(amt):''}${dd?' · '+dd:''}`;
+    };
     openModal(`
-      <div class="modal-title">Conflicto de datos</div>
-      <p class="modal-body-text">Hay diferencias entre los datos locales y los de Gist. ¿Cuál quieres conservar?</p>
+      <div class="modal-title">Conflicto (${list.length})</div>
+      <p class="modal-body-text">El mismo ${c.type} se editó en los dos dispositivos. ¿Cuál conservas?</p>
       <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0">
-        <button class="btn-primary" onclick="GistSync._keepLocal();closeModal()">
-          Mantener local<br><span style="font-size:12px;opacity:0.7">${localStr}</span>
+        <button class="btn-primary" onclick="GistSync._pickConflict('local')">
+          Este dispositivo<br><span style="font-size:12px;opacity:0.7">${brief(c.local)}</span>
         </button>
-        <button class="btn-secondary" onclick="GistSync._keepRemote();closeModal()">
-          Usar Gist<br><span style="font-size:12px;opacity:0.7">${remoteStr}</span>
+        <button class="btn-secondary" onclick="GistSync._pickConflict('remote')">
+          Versión del Gist<br><span style="font-size:12px;opacity:0.7">${brief(c.remote)}</span>
         </button>
       </div>
-      <button class="btn-secondary btn-muted" onclick="closeModal()" style="width:100%;margin-top:4px">Decidir más tarde</button>
     `);
+  },
+
+  _pickConflict(which){
+    const list = window._syncConflicts||[];
+    const c = list.shift();
+    if(c){
+      const chosen = which==='remote' ? c.remote : c.local;
+      const arr = c.type==='ticket' ? DB.tickets : DB.expenses;
+      const i = arr.findIndex(x=>x.id===c.id);
+      if(i>=0) arr[i]=chosen;
+      saveDB();
+    }
+    closeModal();
+    if(list.length){ this._resolveConflicts(); }
+    else { if(GistSync.isAdmin()) GistSync.push(); showScreen(currentScreen); showToast('Conflictos resueltos',2000); }
   },
 
   _keepLocal(){
