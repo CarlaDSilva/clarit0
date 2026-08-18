@@ -51,7 +51,7 @@ function hideSplash(){const s=document.getElementById('splash');s.classList.add(
 let currentScreen='home';
 function showScreen(name){currentScreen=name;document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('nav-'+name)?.classList.add('active');document.getElementById('view').scrollTop=0;if(name==='stats')_statsMonthOffset=0;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();updateAIBadge();}
 
-let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.0.1 · Lavanda';
+let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.0.2 · Lavanda';
 // setupStep: -1=bienvenida, 0=API keys, 1=personas, 2=nombres/colores, 3=listo
 function startSetup(){document.getElementById('setup-screen').style.display='flex';setupStep=-1;renderSetupStep();}
 function renderSetupStep(){
@@ -1756,6 +1756,31 @@ const ImgDB = {
     try{const db=await this.open();return new Promise((res,rej)=>{const req=db.transaction('images').objectStore('images').get(ticketId);req.onsuccess=()=>res(req.result||null);req.onerror=()=>res(null);});}catch{return null;}
   },
   async delete(ticketId){
+    // Borrado LOCAL en IndexedDB (la nube se gestiona aparte en CloudImg.delete)
+    try{const db=await this.open();const tx=db.transaction('images','readwrite');tx.objectStore('images').delete(ticketId);}catch(e){}
+  }
+};
+
+// ── CLOUDINARY — almacén remoto de imágenes (borrado vía Worker) ──
+const CloudImg = {
+  _hasConfig(){ return !!(DB.cloudinaryCloud && DB.cloudinaryPreset); },
+
+  async upload(ticketId, b64jpeg){
+    if(!this._hasConfig()) return null;
+    try{
+      const form=new FormData();
+      form.append('file','data:image/jpeg;base64,'+b64jpeg);
+      form.append('upload_preset', DB.cloudinaryPreset);
+      form.append('public_id', 'clarito_'+ticketId);
+      form.append('folder','clarito');
+      const res=await fetch(`https://api.cloudinary.com/v1_1/${DB.cloudinaryCloud}/image/upload`,{method:'POST',body:form});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const data=await res.json();
+      return data.secure_url||null;
+    }catch(e){console.warn('Cloudinary upload error:',e.message);return null;}
+  },
+
+  async delete(ticketId){
     if(!DB.cloudinaryWorker) return; // sin Worker no se borra en la nube; se hace desde su panel
     try{
       const publicId='clarito/clarito_'+ticketId;
@@ -1765,7 +1790,6 @@ const ImgDB = {
 
   async getUrl(ticketId){
     if(!this._hasConfig()) return null;
-    // Construct URL directly — no need for API call
     return `https://res.cloudinary.com/${DB.cloudinaryCloud}/image/upload/clarito/clarito_${ticketId}.jpg`;
   }
 };
