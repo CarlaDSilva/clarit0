@@ -51,7 +51,7 @@ function hideSplash(){const s=document.getElementById('splash');s.classList.add(
 let currentScreen='home';
 function showScreen(name){currentScreen=name;document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('nav-'+name)?.classList.add('active');document.getElementById('view').scrollTop=0;if(name==='stats')_statsMonthOffset=0;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();updateAIBadge();}
 
-let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.1.0 · Lavanda';
+let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.2.0 · Lavanda';
 // setupStep: -1=bienvenida, 0=API keys, 1=personas, 2=nombres/colores, 3=listo
 function startSetup(){document.getElementById('setup-screen').style.display='flex';setupStep=-1;renderSetupStep();}
 function renderSetupStep(){
@@ -753,7 +753,7 @@ function renderHome(){
   const bal=calcBalance();
   const recent=[...DB.tickets,...DB.expenses].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
   document.getElementById('view').innerHTML=`
-    <div class="screen-header"><div class="header-brand"><img src="icon.png" class="header-logo" onclick="onLogoTap()" onerror="this.style.display='none'"/><h1>Clarito</h1></div></div>
+    <div class="screen-header"><div class="header-brand"><img src="icon.png" class="header-logo" onclick="onErudaTap()" onerror="this.style.display='none'"/><h1>Clarito</h1></div></div>
     <div class="balance-hero">
       <div class="balance-hero-label">Balance actual</div>
       ${bal.amount<0.01
@@ -1026,11 +1026,39 @@ function renderBalance(){
     ${amount<0.01?`<div class="balance-card"><div class="bc-owes settled">Cuentas al día</div><div class="bc-amount bc-ok">Sin deuda</div></div>`:`<div class="balance-card"><div class="bc-owes">${personName(owes)} debe a ${creditor?.name}</div><div class="bc-amount">${fmt(amount)}</div></div><button class="settle-btn" onclick="settleAccounts()">Cuentas saldadas</button>`}
     <div class="balance-persons-grid">${DB.persons.map(p=>`<div class="stat-card stat-card-person" style="--person-color:${p.color}"><div class="stat-label">${p.name}</div><div class="stat-value">${fmt(paid[p.id]||0)}</div></div>`).join('')}</div>
     <div class="recent-label">Historial</div>
-    ${settlements.length===0?`<div class="empty-state"><p>Sin liquidaciones todavía</p></div>`:settlements.map(s=>`<div class="history-settle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><div class="settle-date">${fmtDate(s.date)}</div><div class="settle-info">${s.msg}</div></div>`).join('')}`;
+    ${settlements.length===0?`<div class="empty-state"><p>Sin liquidaciones todavía</p></div>`:settlements.map(s=>`<div class="history-settle" onclick="openSettlementDetail('${s.id}')" style="cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><div class="settle-date">${fmtDate(s.date)}</div><div class="settle-info">${s.msg}</div><div class="settings-arrow">›</div></div>`).join('')}`;
   applyReadOnlyUI();
 }
+function openSettlementDetail(sid){
+  const s=DB.settlements.find(x=>x.id===sid);
+  if(!s){showToast('Liquidación no encontrada');return;}
+  const head=`<div class="modal-title">${fmtDate(s.date)}</div><p class="modal-hint" style="margin-bottom:14px">${s.msg}</p>`;
+  // Liquidaciones anteriores a esta función: no guardaron qué tickets cubrían
+  if(!Array.isArray(s.ticketIds)){
+    openModal(head+`<p class="modal-body-text">Sin desglose (liquidación antigua).</p><div class="modal-actions"><button class="btn-primary" onclick="closeModal()">Cerrar</button></div>`);
+    return;
+  }
+  const tks=s.ticketIds.map(id=>DB.tickets.find(t=>t.id===id)).filter(Boolean);
+  const exs=(s.expenseIds||[]).map(id=>DB.expenses.find(e=>e.id===id)).filter(Boolean);
+  if(tks.length===0&&exs.length===0){
+    openModal(head+`<p class="modal-body-text">Esta liquidación no cubría tickets ni gastos registrados.</p><div class="modal-actions"><button class="btn-primary" onclick="closeModal()">Cerrar</button></div>`);
+    return;
+  }
+  // Resumen por persona: productos con dueño (assignedTo) + grupo Comunes
+  const byPerson={}; const commons=[]; DB.persons.forEach(p=>byPerson[p.id]=[]);
+  tks.forEach(t=>{(t.products||[]).forEach(pr=>{const price=parseFloat(pr.finalPrice||pr.price||0);if(isNaN(price)||price<=0)return;const item={name:pr.name||pr.rawName||'?',price,store:t.store};if(pr.assignedTo&&byPerson[pr.assignedTo])byPerson[pr.assignedTo].push(item);else commons.push(item);});});
+  const sumItems=arr=>arr.reduce((a,b)=>a+b.price,0);
+  const rowsFor=arr=>arr.slice().sort((a,b)=>b.price-a.price).map(i=>`<div class="stats-brk-row"><span class="stats-brk-name">${i.name}</span><span>${fmt(i.price)}</span></div>`).join('');
+  let personBlocks=DB.persons.map(p=>{const items=byPerson[p.id];if(!items.length)return '';return `<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl" style="color:${personColor(p.id)}">${p.name}</span><span class="stats-collapse-amt">${fmt(sumItems(items))}</span></summary><div class="stats-breakdown">${rowsFor(items)}</div></details>`;}).join('');
+  if(commons.length)personBlocks+=`<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl">Comunes</span><span class="stats-collapse-amt">${fmt(sumItems(commons))}</span></summary><div class="stats-breakdown">${rowsFor(commons)}</div></details>`;
+  // Lista de tickets
+  const ticketList=tks.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(t=>`<div class="stats-brk-row"><span class="stats-brk-name">${t.store||'Ticket'} · ${fmtDate(t.date)}</span><span>${fmt(t.total||0)}</span></div>`).join('');
+  const expenseList=exs.length?exs.map(e=>`<div class="stats-brk-row"><span class="stats-brk-name">${e.store||e.description||'Gasto'} · ${fmtDate(e.date)}</span><span>${fmt(e.total||0)}</span></div>`).join(''):'';
+  const listBlock=`<details class="stats-collapse"><summary class="stats-collapse-sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg><span class="stats-collapse-ttl">Tickets (${tks.length}${exs.length?' + '+exs.length+' gastos':''})</span></summary><div class="stats-breakdown">${ticketList}${expenseList}</div></details>`;
+  openModal(head+`<div style="max-height:60vh;overflow-y:auto;margin-bottom:14px">${personBlocks}${listBlock}</div><div class="modal-actions"><button class="btn-primary" onclick="closeModal()">Cerrar</button></div>`);
+}
 function settleAccounts(){if(GistSync.isReadOnly()){showToast('Modo solo lectura');return;}const {owes,amount}=calcBalance();if(amount<0.01){showToast('No hay deuda que saldar');return;}openModal(`<div class="modal-title">¿Está todo Clarito?</div><p class="modal-body-text">Se registrará la liquidación a día de hoy.</p><div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn-primary" onclick="confirmSettle()">Confirmar</button></div>`);}
-function confirmSettle(){const btn=document.querySelector('.btn-primary[onclick="confirmSettle()"]');if(btn){btn.disabled=true;btn.style.opacity='0.5';}const {owes,amount}=calcBalance();if(amount<0.01){closeModal();return;}const creditor=DB.persons.find(p=>p.id!==owes);if(!owes||!creditor){closeModal();return;}DB.settlements.push({id:uid(),date:new Date().toISOString(),msg:`${personName(owes)} pagó ${fmt(amount)} a ${creditor.name}`,amount,owes});DB.tickets.forEach(t=>{if(t.confirmed)t.settled=true;});DB.expenses.forEach(e=>{if(e.confirmed)e.settled=true;});S.set('settledTicketIds',DB.tickets.filter(t=>t.settled).map(t=>t.id));saveDB();closeModal();showToast('Todo está Clarito',3000);currentScreen='balance';renderBalance();}
+function confirmSettle(){const btn=document.querySelector('.btn-primary[onclick="confirmSettle()"]');if(btn){btn.disabled=true;btn.style.opacity='0.5';}const {owes,amount}=calcBalance();if(amount<0.01){closeModal();return;}const creditor=DB.persons.find(p=>p.id!==owes);if(!owes||!creditor){closeModal();return;}const sid=uid();const coveredTickets=DB.tickets.filter(t=>t.confirmed&&!t.settled).map(t=>t.id);const coveredExpenses=DB.expenses.filter(e=>e.confirmed&&!e.settled).map(e=>e.id);DB.settlements.push({id:sid,date:new Date().toISOString(),msg:`${personName(owes)} pagó ${fmt(amount)} a ${creditor.name}`,amount,owes,ticketIds:coveredTickets,expenseIds:coveredExpenses});DB.tickets.forEach(t=>{if(t.confirmed&&!t.settled){t.settled=true;t.settledBy=sid;}});DB.expenses.forEach(e=>{if(e.confirmed&&!e.settled){e.settled=true;e.settledBy=sid;}});S.set('settledTicketIds',DB.tickets.filter(t=>t.settled).map(t=>t.id));saveDB();closeModal();showToast('Todo está Clarito',3000);currentScreen='balance';renderBalance();}
 
 // ── STATS ─────────────────────────────────────────────────────
 function computeMonthStats(offset){
@@ -1515,7 +1543,7 @@ function addManualDespensa(name,store,days){
 // ── SETTINGS ──────────────────────────────────────────────────
 function renderSettings(){
   document.getElementById('view').innerHTML=`
-    <div class="screen-header"><div class="header-brand"><img src="icon.png" class="header-logo" onclick="onLogoTap()" onerror="this.style.display='none'"/><h1>Configuración</h1></div></div>
+    <div class="screen-header"><div class="header-brand"><img src="icon.png" class="header-logo" onclick="onDevTap()" onerror="this.style.display='none'"/><h1>Configuración</h1></div></div>
     <div class="settings-section" style="padding-top:24px"><div class="settings-section-title">Personas (${DB.persons.length})</div>
       <div class="settings-group">
         ${DB.persons.map((p,i)=>`<div class="settings-row" onclick="editPerson(${i})"><div class="settings-icon" style="background:${p.color}"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div><div class="settings-label">${p.name}</div><div class="settings-value">${p.cards.length} tarjeta(s)</div><div class="settings-arrow">›</div></div>`).join('')}
@@ -1662,10 +1690,15 @@ function toggleEruda(){
   s.onerror=()=>showToast('No se pudo cargar Eruda (sin conexión)',2500);
   document.body.appendChild(s);
 }
-function onLogoTap(){
+let _erudaTaps=0,_erudaTimer=null;
+function onErudaTap(){                               // icono de la pantalla de tokens/inicio: SOLO Eruda
+  _erudaTaps++; clearTimeout(_erudaTimer);
+  if(_erudaTaps>=3){ _erudaTaps=0; toggleEruda(); return; }
+  _erudaTimer=setTimeout(()=>{_erudaTaps=0;},1200);
+}
+function onDevTap(){                                 // icono de la pantalla de Configuración: SOLO modo desarrollador
   _devTaps++; clearTimeout(_devTimer);
-  if(_devTaps%3===0) toggleEruda();                 // cada 3 taps: alterna Eruda (activa/desactiva)
-  if(_devTaps>=13){                                  // 13 taps: alterna modo desarrollador (gesto existente)
+  if(_devTaps>=13){
     _devTaps=0; DB.devMode=!DB.devMode; S.set('devMode',DB.devMode); saveDB(); renderSettings();
     showToast(DB.devMode?'Modo desarrollador activado':'Modo desarrollador desactivado',2000); return;
   }
