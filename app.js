@@ -51,7 +51,7 @@ function hideSplash(){const s=document.getElementById('splash');s.classList.add(
 let currentScreen='home';
 function showScreen(name){currentScreen=name;document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('nav-'+name)?.classList.add('active');document.getElementById('view').scrollTop=0;if(name==='stats')_statsMonthOffset=0;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();updateAIBadge();}
 
-let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.2.0 · Lavanda';
+let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.3.0 · Lavanda';
 // setupStep: -1=bienvenida, 0=API keys, 1=personas, 2=nombres/colores, 3=listo
 function startSetup(){document.getElementById('setup-screen').style.display='flex';setupStep=-1;renderSetupStep();}
 function renderSetupStep(){
@@ -1551,11 +1551,6 @@ function renderSettings(){
       </div>
     </div>
     ${DB.devMode?renderDevSettings():''}
-    <div class="settings-section"><div class="settings-section-title">Almacenamiento</div>
-      <div class="settings-group"><div class="settings-row"><div class="settings-label">Uso local (fotos + datos)</div><div class="settings-value" id="cap-usage">…</div></div>
-        <div class="settings-row" onclick="cloudinaryUsage()"><div class="settings-label">Uso Cloudinary</div><div class="settings-value" id="cld-usage">Pulsa para ver</div><div class="settings-arrow">↻</div></div>
-        <div class="settings-row" onclick="cloudinaryPrunePrompt()"><div class="settings-label">Liberar % de Cloudinary</div><div class="settings-arrow">›</div></div></div>
-    </div>
     <p class="settings-footer">Clarito ${APP_VERSION} · Datos guardados localmente</p>`;
   fillCapUsage();
   applyReadOnlyUI();
@@ -1583,9 +1578,9 @@ function renderDevSettings(){return`
     <div class="settings-row" onclick="editGroqKey()"><div class="settings-icon settings-icon-groq"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="settings-label">Groq Key (chat IA)</div><div class="settings-value">${DB.groqKey?'•••'+DB.groqKey.slice(-4):'No configurada'}</div><div class="settings-arrow">›</div></div>
     ${DB.groqKey?`<div class="settings-row" onclick="showGroqStats()"><div class="settings-icon settings-icon-groq-stats"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="settings-label">Uso de Groq</div><div class="settings-value">${DB.groqStats?.calls||0} llamadas · ${Math.round((DB.groqStats?.tokensUsed||0)/1000)}k tokens</div><div class="settings-arrow">›</div></div>`:''}
   </div></div>
-  <div class="settings-section"><div class="settings-section-title">Tarjetas conocidas</div><div class="settings-group">
+  <div class="settings-section"><details class="settings-collapse"><summary class="settings-section-title" style="cursor:pointer;list-style:none">Tarjetas conocidas <span style="color:var(--txt3);font-size:12px">(${Object.keys(DB.knowledge.cards||{}).length})</span></summary><div class="settings-group" style="margin-top:8px">
     ${Object.keys(DB.knowledge.cards||{}).length===0?`<div class="settings-row"><div class="settings-label settings-label-empty">Sin tarjetas registradas</div></div>`:Object.entries(DB.knowledge.cards||{}).map(([l4,pid])=>`<div class="settings-row"><div class="settings-icon settings-icon-card"><svg viewBox="0 0 24 24" fill="none"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><div class="settings-label">•••• ${l4}</div><div class="settings-value" style="color:${personColor(pid)};font-weight:600">${personName(pid)}</div><button onclick="forgetCard('${l4}')" class="btn-remove-inline">×</button></div>`).join('')}
-  </div></div>
+  </div></details></div>
   <div class="settings-section"><div class="settings-section-title">Datos</div><div class="settings-group">
     <div class="settings-row" onclick="editKnowledgeProducts()"><div class="settings-label">Productos aprendidos</div><div class="settings-value">${Object.keys(DB.knowledge.products||{}).length}</div><div class="settings-arrow">›</div></div>
     <div class="settings-row" onclick="clearKnowledge()"><div class="settings-label settings-label-danger">Borrar conocimiento IA</div></div>
@@ -1596,6 +1591,11 @@ function renderDevSettings(){return`
   <div class="settings-section"><div class="settings-section-title">Estadísticas</div><div class="settings-group">
     
   </div></div>
+  <div class="settings-section"><div class="settings-section-title">Almacenamiento</div>
+    <div class="settings-group"><div class="settings-row"><div class="settings-label">Uso local (fotos + datos)</div><div class="settings-value" id="cap-usage">…</div></div>
+      <div class="settings-row" onclick="cloudinaryUsage()"><div class="settings-label">Uso Cloudinary</div><div class="settings-value" id="cld-usage">Pulsa para ver</div><div class="settings-arrow">↻</div></div>
+      <div class="settings-row" onclick="cloudinaryPrunePrompt()"><div class="settings-label">Liberar % de Cloudinary</div><div class="settings-arrow">›</div></div></div>
+  </div>
   <div class="settings-action-row"><button class="btn-secondary btn-full" onclick="gistActualizar()">Actualizar</button></div>
   <div class="settings-action-row"><button class="btn-secondary btn-full btn-muted" onclick="DB.devMode=false;S.set('devMode',false);saveDB();renderSettings();showToast('Modo desarrollador desactivado')">Ocultar opciones de desarrollador</button></div>`;}
 
@@ -1833,7 +1833,7 @@ const CloudImg = {
     if(!DB.cloudinaryWorker) return; // sin Worker no se borra en la nube; se hace desde su panel
     try{
       const publicId='clarito/clarito_'+ticketId;
-      await fetch(DB.cloudinaryWorker.replace(/\/$/,'')+'/destroy',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')},body:JSON.stringify({public_id:publicId})});
+      await fetch(cloudWorkerBase()+'/destroy',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')},body:JSON.stringify({public_id:publicId})});
     }catch(e){console.warn('Cloudinary delete (worker) error:',e.message);}
   },
 
@@ -1893,12 +1893,13 @@ async function fillCapUsage(){
   const r=await Cap.ratio();
   el.textContent=r?(Math.round(r.ratio*100)+'% · '+(r.usage/1048576).toFixed(1)+' / '+(r.quota/1048576).toFixed(0)+' MB'):'No disponible';
 }
+function cloudWorkerBase(){let u=(DB.cloudinaryWorker||'').trim();if(!u)return '';if(!/^https?:\/\//i.test(u))u='https://'+u;return u.replace(/\/$/,'');}
 async function cloudinaryUsage(){
   const el=document.getElementById('cld-usage');
   if(!DB.cloudinaryWorker){if(el)el.textContent='Falta URL del Worker';return;}
   if(el)el.textContent='Cargando...';
   try{
-    const r=await fetch(DB.cloudinaryWorker.replace(/\/$/,'')+'/usage',{headers:{'Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')}});
+    const r=await fetch(cloudWorkerBase()+'/usage',{headers:{'Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')}});
     const d=await r.json();
     if(!r.ok){if(el)el.textContent='Error '+(r.status);return;}
     const pct=d.percent!=null?Math.round(d.percent)+'%':'—';
@@ -1915,7 +1916,7 @@ async function cloudinaryPrune(){
   if(!pct||pct<1){showToast('Introduce un porcentaje');return;}
   closeModal();showToast('Borrando en Cloudinary...');
   try{
-    const r=await fetch(DB.cloudinaryWorker.replace(/\/$/,'')+'/prune',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')},body:JSON.stringify({percent:pct})});
+    const r=await fetch(cloudWorkerBase()+'/prune',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(DB.cloudinaryWorkerToken||'')},body:JSON.stringify({percent:pct})});
     const d=await r.json();
     if(!r.ok){showToast('Error: '+(d.error||r.status),4000);return;}
     showToast('Borradas '+d.deleted+' de '+d.total+' imágenes',4000);
@@ -1972,32 +1973,53 @@ const GistSync = {
     showToast('Sin conexión — datos guardados localmente',3000);
   },
 
+  _pushing:false, _pushAgain:false,
+
   async push(){
     if(!this.isAdmin()) return;
-    try{
-      const payload = JSON.parse(JSON.stringify(DB));
-      // Nunca subir claves sensibles al Gist
-      delete payload.aiConvMessages;
-      delete payload.visionKey;
-      delete payload.groqKey;
-      delete payload.gistToken;
-      delete payload.apiKey;
-      delete payload.cloudinarySecret;
-      delete payload.cloudinaryApiKey;
-      delete payload.cloudinaryWorkerToken;
-      payload._syncedAt = new Date().toISOString();
-      const res = await fetch(`https://api.github.com/gists/${DB.gistId}`,{
-        method:'PATCH',
-        headers:{'Authorization':'Bearer '+DB.gistToken,'Content-Type':'application/json'},
-        body: JSON.stringify({files:{'clarito-data.json':{content:JSON.stringify(payload,null,2)}}})
-      });
-      if(res.status===401) throw new Error('Token inválido o sin permiso gist — revisa el token en Ajustes');
-      if(!res.ok) throw new Error('HTTP '+res.status);
-      DB._syncedAt = payload._syncedAt;
-      saveDB();
-    } catch(e){
-      if(e.message.includes('fetch')||e.message.includes('network')||e.message.includes('Failed')) this._noConnToast();
-      else showToast('Error al guardar en Gist: '+e.message, 3000);
+    if(this._pushing){ this._pushAgain=true; return; }   // ya hay un push en curso → encola uno solo
+    this._pushing=true;
+    try{ await this._doPush(); }
+    finally{
+      this._pushing=false;
+      if(this._pushAgain){ this._pushAgain=false; this.push(); }  // ejecuta el push encolado
+    }
+  },
+
+  async _doPush(){
+    const payload = JSON.parse(JSON.stringify(DB));
+    // Nunca subir claves sensibles al Gist
+    delete payload.aiConvMessages;
+    delete payload.visionKey;
+    delete payload.groqKey;
+    delete payload.gistToken;
+    delete payload.apiKey;
+    delete payload.cloudinarySecret;
+    delete payload.cloudinaryApiKey;
+    delete payload.cloudinaryWorkerToken;
+    payload._syncedAt = new Date().toISOString();
+    const body = JSON.stringify({files:{'clarito-data.json':{content:JSON.stringify(payload,null,2)}}});
+    for(let attempt=0; attempt<2; attempt++){
+      try{
+        const res = await fetch(`https://api.github.com/gists/${DB.gistId}`,{
+          method:'PATCH',
+          headers:{'Authorization':'Bearer '+DB.gistToken,'Content-Type':'application/json'},
+          body
+        });
+        if(res.status===401){ showToast('Token inválido o sin permiso gist — revisa el token en Ajustes',3000); return; }
+        if((res.status===409 || res.status>=500) && attempt===0){
+          await new Promise(r=>setTimeout(r,1200));   // conflicto de concurrencia → espera y reintenta una vez
+          continue;
+        }
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        DB._syncedAt = payload._syncedAt;
+        saveDB();
+        return;
+      }catch(e){
+        if(e.message.includes('fetch')||e.message.includes('network')||e.message.includes('Failed')){ this._noConnToast(); return; }
+        if(attempt===0){ await new Promise(r=>setTimeout(r,1200)); continue; }
+        showToast('Error al guardar en Gist: '+e.message, 3000); return;
+      }
     }
   },
 
