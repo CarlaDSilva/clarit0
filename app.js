@@ -51,7 +51,7 @@ function hideSplash(){const s=document.getElementById('splash');s.classList.add(
 let currentScreen='home';
 function showScreen(name){currentScreen=name;document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('nav-'+name)?.classList.add('active');document.getElementById('view').scrollTop=0;if(name==='stats')_statsMonthOffset=0;({home:renderHome,tickets:renderTickets,balance:renderBalance,stats:renderStats,settings:renderSettings})[name]?.();updateAIBadge();}
 
-let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.3.0 · Lavanda';
+let setupStep=-1,setupPersonCount=2,_statsMonthOffset=0,_statsMode='month';const APP_VERSION='v4.3.1 · Lavanda';
 // setupStep: -1=bienvenida, 0=API keys, 1=personas, 2=nombres/colores, 3=listo
 function startSetup(){document.getElementById('setup-screen').style.display='flex';setupStep=-1;renderSetupStep();}
 function renderSetupStep(){
@@ -797,7 +797,7 @@ function calcBalance(){
 
 function renderTickets(){
   const RO=GistSync.isReadOnly();
-  const all=DB.tickets.slice().reverse();const active=all.filter(t=>!t.settled);const past=all.filter(t=>t.settled);
+  const all=DB.tickets.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));const active=all.filter(t=>!t.settled);const past=all.filter(t=>t.settled);
   document.getElementById('view').innerHTML=`
     <div class="screen-header"><h1>Tickets</h1><p>${active.length} activos</p></div>
     ${RO?'':`<div class="upload-zone" onclick="triggerFileGallery()"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3"/><polyline points="12 8 12 16"/><polyline points="8 12 12 8 16 12"/></svg><h3>Subir ticket</h3></div><div class="upload-actions"><button class="btn-secondary" onclick="triggerCamera()">Cámara</button><button class="btn-secondary" onclick="openManualTicket()">Manual</button></div>`}
